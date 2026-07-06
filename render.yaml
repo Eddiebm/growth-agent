@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: growth-agent-api
+    name: growth-agent-crm
     runtime: node
     plan: free
     region: oregon
