@@ -1,0 +1,34 @@
+{
+  "input": {
+    "agentId": "lead_scorer",
+    "companyId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "contactId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "icpDocVersion": "1.0",
+    "researcherOutput": {
+      "domain": "brightedge-seo.com",
+      "companyName": "BrightEdge SEO",
+      "industry": "SEO Agency",
+      "employeeCount": 42,
+      "country": "US",
+      "description": "Full-service SEO agency...",
+      "linkedinUrl": "https://linkedin.com/company/brightedge-seo",
+      "techStack": ["HubSpot", "Semrush", "Zapier"],
+      "recentSignals": [{ "signal": "Hiring BDR", "source": "linkedin_jobs" }],
+      "confidence": 0.85,
+      "sources": ["apollo"]
+    }
+  },
+  "output": {
+    "companyScore": 82,
+    "contactScore": 78,
+    "fit": "high",
+    "reasons": [
+      "Industry match: SEO agency (+30)",
+      "Employee count 42 in 10-100 range (+20)",
+      "Contact title: Head of Operations (+20)",
+      "Uses HubSpot and Zapier (+15)"
+    ],
+    "disqualify": false,
+    "recommendedAction": "enroll_outreach"
+  }
+}

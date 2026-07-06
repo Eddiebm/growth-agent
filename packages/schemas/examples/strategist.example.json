@@ -1,0 +1,61 @@
+{
+  "input": {
+    "agentId": "strategist",
+    "periodStart": "2026-06-28T00:00:00Z",
+    "periodEnd": "2026-07-05T00:00:00Z",
+    "metrics": {
+      "emailsSent": 47,
+      "openRate": 0.42,
+      "replyRate": 0.085,
+      "positiveReplyRate": 0.043,
+      "meetingsBooked": 2,
+      "costUsd": 1.24,
+      "topVariants": [
+        { "label": "A", "replyRate": 0.11 },
+        { "label": "B", "replyRate": 0.06 }
+      ]
+    }
+  },
+  "output": {
+    "summary": "Strong week: 8.5% reply rate beats benchmark. Subject variant A outperforming B by 83%. Two meetings booked at $0.62 each.",
+    "wins": [
+      "Variant A subject line ('quick question about...') winning",
+      "Hiring-signal personalization correlating with replies"
+    ],
+    "losses": [
+      "3 unsubscribes — check if step 0 is too direct",
+      "UK contacts underperforming vs US"
+    ],
+    "recommendations": [
+      {
+        "type": "messaging_change",
+        "priority": "high",
+        "description": "Retire variant B, make variant A the default subject template",
+        "requiresApproval": false
+      },
+      {
+        "type": "icp_change",
+        "priority": "medium",
+        "description": "Deprioritize UK until messaging is localized",
+        "requiresApproval": true
+      },
+      {
+        "type": "new_experiment",
+        "priority": "medium",
+        "description": "Test case-study opener vs hiring-signal opener",
+        "requiresApproval": false
+      }
+    ],
+    "proposedExperiments": [
+      {
+        "name": "opener-type-test",
+        "hypothesis": "Case study openers convert better than hiring signals for established agencies",
+        "metric": "positive_reply_rate",
+        "variants": [
+          { "label": "hiring_signal", "payload": { "hookType": "hiring" } },
+          { "label": "case_study", "payload": { "hookType": "case_study" } }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growth-agent.local/schemas/researcher.json",
+  "title": "ResearcherAgentIO",
+  "type": "object",
+  "properties": {
+    "input": {
+      "type": "object",
+      "required": ["agentId", "domain"],
+      "properties": {
+        "agentId": { "const": "researcher" },
+        "companyId": { "type": "string", "format": "uuid" },
+        "domain": { "type": "string", "example": "acme-seo.com" },
+        "companyName": { "type": "string" },
+        "jobId": { "type": "string", "format": "uuid" }
+      }
+    },
+    "output": {
+      "type": "object",
+      "required": ["domain", "companyName", "description", "confidence"],
+      "properties": {
+        "domain": { "type": "string" },
+        "companyName": { "type": "string" },
+        "industry": { "type": ["string", "null"] },
+        "employeeCount": { "type": ["integer", "null"] },
+        "country": { "type": ["string", "null"] },
+        "description": { "type": "string", "maxLength": 2000 },
+        "linkedinUrl": { "type": ["string", "null"], "format": "uri" },
+        "techStack": { "type": "array", "items": { "type": "string" } },
+        "recentSignals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["signal", "source"],
+            "properties": {
+              "signal": { "type": "string" },
+              "source": { "type": "string" },
+              "observedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "sources": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

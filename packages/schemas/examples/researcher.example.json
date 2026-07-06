@@ -1,0 +1,27 @@
+{
+  "input": {
+    "agentId": "researcher",
+    "domain": "brightedge-seo.com",
+    "companyName": "BrightEdge SEO",
+    "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  },
+  "output": {
+    "domain": "brightedge-seo.com",
+    "companyName": "BrightEdge SEO",
+    "industry": "SEO Agency",
+    "employeeCount": 42,
+    "country": "US",
+    "description": "Full-service SEO agency focused on e-commerce brands. Runs retainers for 30+ clients. Recently posted a job for a Business Development Rep.",
+    "linkedinUrl": "https://linkedin.com/company/brightedge-seo",
+    "techStack": ["HubSpot", "Semrush", "Zapier"],
+    "recentSignals": [
+      {
+        "signal": "Hiring Business Development Rep",
+        "source": "linkedin_jobs",
+        "observedAt": "2026-06-28T00:00:00Z"
+      }
+    ],
+    "confidence": 0.85,
+    "sources": ["company_website", "linkedin", "apollo"]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "input": {
+    "agentId": "copywriter",
+    "contactId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "campaignId": "d4e5f6a7-b8c9-0123-def0-234567890123",
+    "sequenceStep": 0,
+    "channel": "email",
+    "playbookId": "seo-agency-outreach-v1",
+    "variantLabel": "A",
+    "priorMessages": []
+  },
+  "output": {
+    "subject": "quick question about BrightEdge SEO's lead gen",
+    "bodyText": "Hi Sarah,\n\nSaw BrightEdge is hiring a BDR — usually a sign outreach is eating bandwidth. Most SEO shops your size lose 5–10 hrs/week on manual prospecting.\n\nWe build AI bots that automate lead gen for about $500. Worth a 15-minute call this week?\n\nEddie",
+    "personalizationTokens": {
+      "first_name": "Sarah",
+      "company": "BrightEdge SEO",
+      "personalization_hook": "Saw BrightEdge is hiring a BDR — usually a sign outreach is eating bandwidth."
+    },
+    "callToAction": "Book a 15-minute call",
+    "toneCheck": { "onBrand": true, "issues": [] },
+    "requiresApproval": false
+  }
+}

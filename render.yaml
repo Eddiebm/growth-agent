@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: growth-agent-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npx tsx apps/api/src/server.ts
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: MOCK_INTEGRATIONS
+        value: "false"
+      - key: CRON_ENABLED
+        value: "true"
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /health

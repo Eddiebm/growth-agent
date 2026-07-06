@@ -1,0 +1,33 @@
+{
+  "name": "growth-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:migrate": "tsx scripts/migrate.ts",
+    "catalog:sync": "tsx scripts/catalog-sync.ts",
+    "typecheck": "tsc --noEmit",
+    "start:api": "tsx apps/api/src/server.ts",
+    "jobs:run": "tsx apps/api/src/jobs/run-worker.ts",
+    "jobs:once": "tsx apps/api/src/jobs/run-worker.ts -- --once",
+    "jobs:enqueue": "tsx apps/api/src/jobs/run-worker.ts -- --enqueue-today",
+    "webhook:resend": "tsx apps/api/src/webhooks/resend-server.ts",
+    "dev:dashboard": "npm run dev --prefix apps/dashboard",
+    "build:dashboard": "npm run build --prefix apps/dashboard",
+    "dev": "concurrently \"npm run start:api\" \"npm run dev:dashboard\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "dotenv": "^16.4.7",
+    "hono": "^4.7.4",
+    "node-cron": "^3.0.3",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/node-cron": "^3.0.11",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

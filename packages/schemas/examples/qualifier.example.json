@@ -1,0 +1,39 @@
+{
+  "input": {
+    "agentId": "qualifier",
+    "contactId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "threadHistory": [
+      {
+        "direction": "outbound",
+        "body": "Hi Sarah...",
+        "occurredAt": "2026-07-01T08:00:00Z"
+      },
+      {
+        "direction": "inbound",
+        "body": "We're spending about 8 hrs/week on prospecting. Budget is flexible if ROI is clear.",
+        "occurredAt": "2026-07-03T14:22:00Z"
+      }
+    ]
+  },
+  "output": {
+    "bant": {
+      "budget": "likely",
+      "authority": "decision_maker",
+      "need": "acute",
+      "timeline": "this_quarter"
+    },
+    "qualificationScore": 85,
+    "qualified": true,
+    "painPoints": [
+      "8 hrs/week on manual prospecting",
+      "Hiring BDR suggests scaling pain"
+    ],
+    "recommendedOfferId": "bot-mvp",
+    "discoveryQuestions": [
+      "Which CRM do you use today?",
+      "What does your current outreach workflow look like step by step?"
+    ],
+    "meetingBrief": "Sarah (Head of Ops, BrightEdge SEO, 42 employees) spends 8hrs/week on prospecting and is hiring a BDR. Likely budget, wants ROI clarity. Recommend Bot MVP ($500) as entry point.",
+    "redFlags": []
+  }
+}
