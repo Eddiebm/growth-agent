@@ -67,6 +67,8 @@ interface ProductsRepo {
   list(opts?: { status?: Product["status"][] }): Promise<Product[]>;
   listActive(): Promise<Product[]>;
   updateStatus(id: string, status: Product["status"]): Promise<void>;
+  updateLaymanPitch(id: string, laymanPitch: string | null): Promise<void>;
+  updateCacAssumptions(id: string, assumptions: Record<string, unknown>): Promise<void>;
   delete(id: string): Promise<void>;
   upsertFromCatalog(input: CatalogProductInput): Promise<Product>;
 }
@@ -174,6 +176,7 @@ interface CatalogProductInput {
   name: string;
   repo?: string | null;
   description?: string | null;
+  laymanPitch?: string | null;
   status?: Product["status"];
 }
 
@@ -328,6 +331,7 @@ interface ProductRow {
   name: string;
   repo: string | null;
   description: string | null;
+  layman_pitch: string | null;
   status: Product["status"];
   landing_path: string | null;
   price_cents: number | null;
@@ -345,6 +349,7 @@ function mapProduct(row: ProductRow): Product {
     name: row.name,
     repo: row.repo,
     description: row.description,
+    laymanPitch: row.layman_pitch,
     status: row.status,
     landingPath: row.landing_path,
     priceCents: row.price_cents,
@@ -675,6 +680,26 @@ export function createDb(databaseUrl: string): Db {
       `;
     },
 
+    async updateLaymanPitch(id, laymanPitch) {
+      await sql`
+        UPDATE products SET layman_pitch = ${laymanPitch}, updated_at = now()
+        WHERE id = ${id}
+      `;
+    },
+
+    async updateCacAssumptions(id, assumptions) {
+      const product = await products.get(id);
+      const cac = {
+        ...((product.metadata.cac as Record<string, unknown> | undefined) ?? {}),
+        ...assumptions,
+      };
+      const metadata = { ...product.metadata, cac };
+      await sql`
+        UPDATE products SET metadata = ${sql.json(metadata as JSONValue)}, updated_at = now()
+        WHERE id = ${id}
+      `;
+    },
+
     async delete(id) {
       await sql`DELETE FROM products WHERE id = ${id}`;
     },
@@ -682,12 +707,13 @@ export function createDb(databaseUrl: string): Db {
     async upsertFromCatalog(input) {
       const slug = input.slug;
       const [row] = await sql<ProductRow[]>`
-        INSERT INTO products (slug, name, repo, description, status, landing_path)
+        INSERT INTO products (slug, name, repo, description, layman_pitch, status, landing_path)
         VALUES (
           ${slug},
           ${input.name},
           ${input.repo ?? null},
           ${input.description ?? null},
+          ${input.laymanPitch ?? null},
           ${input.status ?? "paused"}::product_status,
           ${`/p/${slug}`}
         )
@@ -695,6 +721,7 @@ export function createDb(databaseUrl: string): Db {
           name = products.name,
           repo = COALESCE(EXCLUDED.repo, products.repo),
           description = COALESCE(EXCLUDED.description, products.description),
+          layman_pitch = COALESCE(products.layman_pitch, EXCLUDED.layman_pitch),
           updated_at = now()
         RETURNING *
       `;

@@ -67,8 +67,8 @@ export default async function LandingPage() {
                     {formatPrice(p.priceCents, p.billing)}
                   </p>
                 )}
-                <p className="mt-3 text-sm text-zinc-500 line-clamp-3">
-                  {p.description ?? "Learn more →"}
+                <p className="mt-3 text-sm leading-relaxed text-zinc-400 line-clamp-4">
+                  {p.laymanPitch ?? p.description ?? "Learn more →"}
                 </p>
               </Link>
             ))}

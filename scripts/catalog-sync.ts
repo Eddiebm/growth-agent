@@ -55,6 +55,11 @@ async function main() {
       name: repo.name,
       repo: `${GITHUB_USER}/${repo.name}`,
       description: repo.description?.trim() || null,
+      laymanPitch:
+        existing?.laymanPitch ??
+        (repo.description?.trim() && repo.description.trim().length >= 20
+          ? repo.description.trim()
+          : null),
       status: existing?.status ?? (repo.isArchived ? "archived" : "paused"),
     });
     upserted += 1;

@@ -101,6 +101,7 @@ export interface Product {
   name: string;
   repo: string | null;
   description: string | null;
+  laymanPitch: string | null;
   status: "active" | "beta" | "paused" | "archived";
   landingPath: string | null;
   priceCents: number | null;

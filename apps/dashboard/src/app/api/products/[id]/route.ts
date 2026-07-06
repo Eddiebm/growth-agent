@@ -25,15 +25,32 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params;
-  const body = (await request.json()) as { status?: string };
+  const body = (await request.json()) as {
+    status?: string;
+    laymanPitch?: string | null;
+    cacAssumptions?: Record<string, number>;
+  };
 
-  if (!body.status || !ALLOWED.has(body.status)) {
+  if (body.status == null && body.laymanPitch === undefined && body.cacAssumptions == null) {
+    return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+  }
+
+  if (body.status != null && !ALLOWED.has(body.status)) {
     return NextResponse.json({ error: "invalid status" }, { status: 400 });
   }
 
   const db = getDb();
   try {
-    await db.products.updateStatus(id, body.status as "active" | "beta" | "paused" | "archived");
+    if (body.status != null) {
+      await db.products.updateStatus(id, body.status as "active" | "beta" | "paused" | "archived");
+    }
+    if (body.laymanPitch !== undefined) {
+      const pitch = body.laymanPitch?.trim() || null;
+      await db.products.updateLaymanPitch(id, pitch);
+    }
+    if (body.cacAssumptions != null) {
+      await db.products.updateCacAssumptions(id, body.cacAssumptions);
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("product update:", err);

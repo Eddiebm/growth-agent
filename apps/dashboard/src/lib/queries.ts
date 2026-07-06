@@ -1,4 +1,9 @@
 import { getDb } from "./db";
+import { parseProductCacAssumptions } from "../../../../packages/economics/cac";
+import {
+  getGlobalCacDefaults as loadGlobalCacDefaults,
+  type GlobalCacDefaults,
+} from "../../../../packages/economics/cac-defaults";
 
 export interface PipelineContact {
   id: string;
@@ -19,12 +24,14 @@ export interface ProductRow {
   slug: string;
   name: string;
   description: string | null;
+  laymanPitch: string | null;
   status: string;
   repo: string | null;
   priceCents: number | null;
   billing: string | null;
   landingPath: string | null;
   contactCount: number;
+  cacAssumptions: import("../../../../packages/economics/cac").ProductCacAssumptions;
 }
 
 export interface ApprovalItem {
@@ -136,16 +143,18 @@ export async function getProducts(): Promise<ProductRow[]> {
         slug: string;
         name: string;
         description: string | null;
+        layman_pitch: string | null;
         status: string;
         repo: string | null;
         price_cents: number | null;
         billing: string | null;
         landing_path: string | null;
+        metadata: unknown;
         contact_count: string;
       }[]
     >`
-      SELECT p.id, p.slug, p.name, p.description, p.status::text AS status,
-             p.repo, p.price_cents, p.billing, p.landing_path,
+      SELECT p.id, p.slug, p.name, p.description, p.layman_pitch, p.status::text AS status,
+             p.repo, p.price_cents, p.billing, p.landing_path, p.metadata,
              COUNT(ct.id)::text AS contact_count
       FROM products p
       LEFT JOIN contacts ct ON ct.product_id = p.id
@@ -157,13 +166,26 @@ export async function getProducts(): Promise<ProductRow[]> {
       slug: r.slug,
       name: r.name,
       description: r.description,
+      laymanPitch: r.layman_pitch,
       status: r.status,
       repo: r.repo,
       priceCents: r.price_cents,
       billing: r.billing,
       landingPath: r.landing_path,
       contactCount: Number(r.contact_count),
+      cacAssumptions: parseProductCacAssumptions(
+        (r.metadata as Record<string, unknown> | null)?.cac,
+      ),
     }));
+  } finally {
+    await db.sql.end();
+  }
+}
+
+export async function getGlobalCacDefaults(): Promise<GlobalCacDefaults> {
+  const db = getDb();
+  try {
+    return await loadGlobalCacDefaults(db);
   } finally {
     await db.sql.end();
   }

@@ -5,6 +5,7 @@
   "scripts": {
     "db:migrate": "tsx scripts/migrate.ts",
     "catalog:sync": "tsx scripts/catalog-sync.ts",
+    "pitches:generate": "tsx scripts/pitch-generate.ts",
     "typecheck": "tsc --noEmit",
     "start:api": "tsx apps/api/src/server.ts",
     "jobs:run": "tsx apps/api/src/jobs/run-worker.ts",
