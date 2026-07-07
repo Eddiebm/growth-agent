@@ -166,6 +166,11 @@ export async function serperSearchProspects(
       const email = await findContactEmail(domain);
       if (!email) continue; // no email → can't do outreach, skip
 
+      const searchCity = city;
+      const stateMatch = city.match(/\b([A-Z]{2})\s*$/i);
+      const state = stateMatch?.[1]?.toUpperCase() ?? null;
+      const cityName = state ? city.replace(/\s+[A-Z]{2}\s*$/i, "").trim() : city;
+
       prospects.push({
         externalId: `serper:${place.cid ?? domain}`,
         companyName: place.title,
@@ -177,6 +182,11 @@ export async function serperSearchProspects(
         contactFirstName: null,
         contactLastName: null,
         contactTitle: "Owner",
+        city: cityName,
+        state,
+        searchCity,
+        contactPhone: place.phoneNumber ?? null,
+        address: place.address ?? null,
       });
     }
   }

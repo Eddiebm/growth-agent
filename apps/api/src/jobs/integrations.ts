@@ -18,6 +18,12 @@ export interface Prospect {
   contactFirstName: string | null;
   contactLastName: string | null;
   contactTitle: string | null;
+  /** Serper / Places */
+  city?: string | null;
+  state?: string | null;
+  searchCity?: string | null;
+  contactPhone?: string | null;
+  address?: string | null;
 }
 
 export interface SendEmailInput {

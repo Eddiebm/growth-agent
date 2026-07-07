@@ -159,6 +159,7 @@ interface UpsertContactInput {
   firstName?: string | null;
   lastName?: string | null;
   title?: string | null;
+  phone?: string | null;
   status?: ContactStatus;
 }
 
@@ -167,9 +168,12 @@ interface ContactPatch {
   leadScore?: number;
   leadScoreReason?: string;
   productId?: string | null;
+  phone?: string | null;
   doNotContact?: boolean;
   unsubscribedAt?: Date;
   lastContactedAt?: Date;
+  lastRepliedAt?: Date;
+  metadata?: Record<string, unknown>;
 }
 
 interface CatalogProductInput {
@@ -290,6 +294,7 @@ function mapContact(row: ContactRow): Contact {
     firstName: row.first_name,
     lastName: row.last_name,
     title: row.title,
+    phone: row.phone,
     status: row.status as ContactStatus,
     leadScore: row.lead_score,
     leadScoreReason: row.lead_score_reason,
@@ -391,6 +396,7 @@ interface ContactRow {
   first_name: string | null;
   last_name: string | null;
   title: string | null;
+  phone: string | null;
   status: string;
   lead_score: number | null;
   lead_score_reason: string | null;
@@ -495,19 +501,21 @@ export function createDb(databaseUrl: string): Db {
 
     async upsertByEmail(input) {
       const [row] = await sql<ContactRow[]>`
-        INSERT INTO contacts (company_id, email, first_name, last_name, title, status)
+        INSERT INTO contacts (company_id, email, first_name, last_name, title, phone, status)
         VALUES (
           ${input.companyId},
           ${input.email},
           ${input.firstName ?? null},
           ${input.lastName ?? null},
           ${input.title ?? null},
+          ${input.phone ?? null},
           ${input.status ?? "new"}
         )
         ON CONFLICT (email) DO UPDATE SET
           first_name = COALESCE(EXCLUDED.first_name, contacts.first_name),
           last_name = COALESCE(EXCLUDED.last_name, contacts.last_name),
           title = COALESCE(EXCLUDED.title, contacts.title),
+          phone = COALESCE(EXCLUDED.phone, contacts.phone),
           status = CASE
             WHEN contacts.status IN ('contacted', 'replied', 'interested', 'won', 'lost')
             THEN contacts.status
@@ -520,15 +528,24 @@ export function createDb(databaseUrl: string): Db {
     },
 
     async update(id, patch) {
+      const existing = await contacts.get(id);
+      const metadata =
+        patch.metadata !== undefined
+          ? { ...existing.metadata, ...patch.metadata }
+          : undefined;
+
       await sql`
         UPDATE contacts SET
           status = COALESCE(${patch.status ?? null}, status),
           lead_score = COALESCE(${patch.leadScore ?? null}, lead_score),
           lead_score_reason = COALESCE(${patch.leadScoreReason ?? null}, lead_score_reason),
           product_id = COALESCE(${patch.productId ?? null}, product_id),
+          phone = COALESCE(${patch.phone ?? null}, phone),
           do_not_contact = COALESCE(${patch.doNotContact ?? null}, do_not_contact),
           unsubscribed_at = COALESCE(${patch.unsubscribedAt ?? null}, unsubscribed_at),
           last_contacted_at = COALESCE(${patch.lastContactedAt ?? null}, last_contacted_at),
+          last_replied_at = COALESCE(${patch.lastRepliedAt ?? null}, last_replied_at),
+          metadata = COALESCE(${metadata ? sql.json(metadata as JSONValue) : null}, metadata),
           updated_at = now()
         WHERE id = ${id}
       `;

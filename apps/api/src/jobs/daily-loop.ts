@@ -51,6 +51,9 @@ import {
   recordVariantImpression,
   runWeeklyLearning,
 } from "../../../../packages/learning/index.js";
+import { buildEmailFooter } from "../../../../packages/vapi/demo-lines.js";
+import { warmFollowUpCall } from "../../../../packages/vapi/warm-call.js";
+import type { Company, Contact } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Job dispatcher
@@ -150,7 +153,14 @@ export async function leadGenJob(
       linkedinUrl: research.linkedinUrl,
       industry: research.industry ?? company.industry,
       employeeCount: research.employeeCount ?? company.employeeCount,
-      metadata: { recentSignals: research.recentSignals, techStack: research.techStack },
+      metadata: {
+        recentSignals: research.recentSignals,
+        techStack: research.techStack,
+        city: prospect.city ?? company.metadata.city,
+        state: prospect.state ?? company.metadata.state,
+        searchCity: prospect.searchCity ?? company.metadata.searchCity,
+        address: prospect.address ?? company.metadata.address,
+      },
     });
 
     // 4. Upsert primary contact
@@ -161,6 +171,7 @@ export async function leadGenJob(
         firstName: prospect.contactFirstName,
         lastName: prospect.contactLastName,
         title: prospect.contactTitle,
+        phone: prospect.contactPhone ?? null,
         status: "enriched",
       });
     }
@@ -429,11 +440,17 @@ export async function outreachJob(
       continue;
     }
 
+    const company = await db.companies.get(contact.companyId);
+    const geo = companyGeo(company);
+    const footer = await buildEmailFooter(geo);
+    const bodyText = `${draft.bodyText ?? ""}${footer.text}`;
+    const bodyHtml = draft.bodyHtml ? `${draft.bodyHtml}${footer.html}` : undefined;
+
     const sent = await sendEmail({
       to: contact.email,
       subject,
-      text: draft.bodyText,
-      html: draft.bodyHtml,
+      text: bodyText,
+      html: bodyHtml,
       tags: { campaignId, contactId: contact.id },
     });
 
@@ -447,7 +464,7 @@ export async function outreachJob(
       sequenceStep: enrollment.sequenceStep,
       direction: "outbound",
       subject,
-      bodyText: draft.bodyText,
+      bodyText,
       providerId: sent.messageId,
       variantId: variant?.id,
     });
@@ -465,11 +482,14 @@ export async function outreachJob(
       campaignId,
       type: "email_sent",
       subject,
-      body: draft.bodyText,
+      body: bodyText,
       externalId: sent.messageId,
       agentId: "orchestrator",
       jobId,
-      metadata: variant ? { experimentVariantId: variant.id, variantLabel: variant.label } : {},
+      metadata: {
+        ...(variant ? { experimentVariantId: variant.id, variantLabel: variant.label } : {}),
+        demoLine: footer.demoLine.number,
+      },
     });
 
     await incrementDailyEmailCounter(db);
@@ -537,6 +557,10 @@ export async function replyTriageJob(
 
     await recordReplyConversion(db, contact.id);
 
+    const repliedAt = new Date();
+    const company = await db.companies.get(contact.companyId);
+    const geo = companyGeo(company);
+
     switch (classification.suggestedNextAction) {
       case "suppress":
         await db.suppression.add(contact.email, "unsubscribe_reply");
@@ -548,11 +572,22 @@ export async function replyTriageJob(
         break;
 
       case "book_meeting":
-        await db.contacts.update(contact.id, { status: "interested" });
+        await db.contacts.update(contact.id, {
+          status: "interested",
+          lastRepliedAt: repliedAt,
+        });
         await notify.hotLead({
           contactId: contact.id,
           summary: classification.summary,
           bookingUrl: process.env.CALCOM_BOOKING_URL,
+        });
+        await maybeWarmFollowUpCall(db, {
+          contact,
+          company,
+          geo,
+          campaignId: reply.campaignId,
+          jobId,
+          summary: classification.summary,
         });
         break;
 
@@ -582,19 +617,19 @@ export async function replyTriageJob(
             scheduledFor: new Date(Date.now() + 5 * 60_000),
           });
         }
-        await db.contacts.update(contact.id, { status: "replied" });
+        await db.contacts.update(contact.id, { status: "replied", lastRepliedAt: repliedAt });
         break;
 
       case "mark_lost":
-        await db.contacts.update(contact.id, { status: "lost" });
+        await db.contacts.update(contact.id, { status: "lost", lastRepliedAt: repliedAt });
         break;
 
       case "add_to_nurture":
-        await db.contacts.update(contact.id, { status: "not_now" });
+        await db.contacts.update(contact.id, { status: "not_now", lastRepliedAt: repliedAt });
         break;
 
       case "no_action":
-        await db.contacts.update(contact.id, { status: "replied" });
+        await db.contacts.update(contact.id, { status: "replied", lastRepliedAt: repliedAt });
         break;
     }
 
@@ -712,6 +747,67 @@ export async function enqueueDailyJobs(db: Db, campaignId: string): Promise<void
       scheduledFor: cronNext(DAILY_CRON_SCHEDULE.learningWeekly),
     });
   }
+}
+
+function companyGeo(company: Company): { state?: string | null; searchCity?: string | null } {
+  const meta = company.metadata;
+  return {
+    state: typeof meta.state === "string" ? meta.state : null,
+    searchCity: typeof meta.searchCity === "string" ? meta.searchCity : null,
+  };
+}
+
+async function maybeWarmFollowUpCall(
+  db: Db,
+  input: {
+    contact: Contact;
+    company: Company;
+    geo: { state?: string | null; searchCity?: string | null };
+    campaignId: string | null;
+    jobId: string;
+    summary?: string;
+  },
+): Promise<void> {
+  const alreadyCalled = input.contact.metadata.vapiWarmCallAt;
+  if (alreadyCalled || !input.contact.phone || input.contact.doNotContact) {
+    return;
+  }
+
+  const result = await warmFollowUpCall({
+    contactId: input.contact.id,
+    campaignId: input.campaignId,
+    phone: input.contact.phone,
+    contactName: input.contact.firstName,
+    companyName: input.company.name,
+    state: input.geo.state,
+    searchCity: input.geo.searchCity,
+    summary: input.summary,
+  });
+
+  if (!result.placed) return;
+
+  await db.contacts.update(input.contact.id, {
+    metadata: {
+      vapiWarmCallAt: new Date().toISOString(),
+      vapiCallId: result.callId,
+      vapiFromNumber: result.demoLine?.number,
+    },
+  });
+
+  await db.activities.create({
+    contactId: input.contact.id,
+    companyId: input.company.id,
+    campaignId: input.campaignId ?? undefined,
+    type: "meeting_proposed",
+    agentId: "orchestrator",
+    jobId: input.jobId,
+    externalId: result.callId,
+    metadata: {
+      channel: "voice",
+      fromNumber: result.demoLine?.number,
+      reason: "warm_reply_book_meeting",
+    },
+  });
 }
 
 function cronNext(_expr: string): Date {

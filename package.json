@@ -6,6 +6,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "go-live:check": "tsx scripts/go-live-check.ts",
     "go-live:hero": "tsx scripts/go-live-hero.ts",
+    "vapi:numbers": "tsx scripts/provision-vapi-numbers.ts",
+    "vapi:setup-sales": "tsx scripts/setup-vapi-sales.ts",
     "catalog:sync": "tsx scripts/catalog-sync.ts",
     "pitches:generate": "tsx scripts/pitch-generate.ts",
     "repo:audit": "tsx scripts/repo-audit.ts",

@@ -31,7 +31,7 @@ fi
 : "${DATABASE_URL:?DATABASE_URL required in .env}"
 
 SERVICE_NAME="growth-agent-crm"
-REPO="https://github.com/Eddiebm/growth-agent"
+REPO="https://github.com/mokoemensah/growth-agent"
 
 echo "==> Checking for existing service..."
 EXISTING=$("$RENDER" services -o json 2>/dev/null | node -e "

@@ -71,6 +71,7 @@ export interface Contact {
   firstName: string | null;
   lastName: string | null;
   title: string | null;
+  phone: string | null;
   status: ContactStatus;
   leadScore: number | null;
   leadScoreReason: string | null;
