@@ -35,7 +35,8 @@ import {
 } from "../../../../packages/product-router/index.js";
 import { routerWeightFromMetadata } from "../../../../packages/learning/index.js";
 import { getHeroIcpFilter } from "../../../../packages/hero-config/index.js";
-import { getDailySendCap, isOutreachPaused } from "../../../../packages/system-state/index.js";
+import { getDailySendCap, getOutreachMode, isOutreachPaused } from "../../../../packages/system-state/index.js";
+import { triggerOutreach } from "../../../../packages/actions/trigger-outreach.js";
 import { runAgent } from "./agent-runner.js";
 import { incrementDailyEmailCounter, type Db } from "./db.js";
 import {
@@ -337,6 +338,18 @@ export async function outreachJob(
     return;
   }
 
+  const outreachMode = await getOutreachMode(db);
+  if (outreachMode === "triggered" && !payload.trigger) {
+    await db.activities.create({
+      campaignId,
+      type: "policy_blocked",
+      agentId: "orchestrator",
+      jobId,
+      metadata: { reason: "Outreach mode is triggered — waiting for explicit trigger" },
+    });
+    return;
+  }
+
   const campaign = await db.campaigns.get(campaignId);
 
   if (campaign.status !== "active") {
@@ -547,6 +560,8 @@ export async function replyTriageJob(
     await db.activities.create({
       contactId: contact.id,
       type: "email_replied",
+      subject: reply.subject,
+      body: reply.bodyText,
       agentId: "reply_classifier",
       jobId,
       metadata: {
@@ -607,15 +622,13 @@ export async function replyTriageJob(
 
       case "send_follow_up":
         if (classification.suggestedReply) {
-          await db.jobs.enqueue({
-            jobType: "outreach",
-            payload: {
-              campaignId: reply.campaignId,
-              batchSize: 1,
-              dryRun: false,
-              _followUpReply: classification.suggestedReply,
-            },
-            scheduledFor: new Date(Date.now() + 5 * 60_000),
+          await triggerOutreach(db, {
+            source: "reply_follow_up",
+            batchSize: 1,
+            contactIds: [contact.id],
+            campaignId: reply.campaignId ?? undefined,
+            triggerId: inbound.id,
+            note: classification.summary,
           });
         }
         await db.contacts.update(contact.id, { status: "replied", lastRepliedAt: repliedAt });
@@ -723,13 +736,22 @@ export async function enqueueDailyJobs(db: Db, campaignId: string): Promise<void
   });
 
   const activeCampaigns = await db.campaigns.listActive();
-  for (const campaign of activeCampaigns) {
-    await db.jobs.enqueue({
-      jobType: "outreach",
-      idempotencyKey: `outreach:${today}:${campaign.slug}`,
-      payload: { campaignId: campaign.id, batchSize: sendCap, dryRun: false },
-      scheduledFor: cronNext(DAILY_CRON_SCHEDULE.outreach),
-    });
+  const outreachMode = await getOutreachMode(db);
+
+  if (outreachMode === "automatic") {
+    for (const campaign of activeCampaigns) {
+      await db.jobs.enqueue({
+        jobType: "outreach",
+        idempotencyKey: `outreach:${today}:${campaign.slug}`,
+        payload: {
+          campaignId: campaign.id,
+          batchSize: sendCap,
+          dryRun: false,
+          trigger: { source: "cron", id: today },
+        },
+        scheduledFor: cronNext(DAILY_CRON_SCHEDULE.outreach),
+      });
+    }
   }
 
   await db.jobs.enqueue({

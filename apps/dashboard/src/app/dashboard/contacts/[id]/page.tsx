@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getContactById } from "@/lib/db";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { EmailThread } from "@/components/email-thread";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,11 @@ export default async function ContactPage({
         {contact.leadScoreReason && (
           <p className="mt-4 text-sm text-zinc-400">{contact.leadScoreReason}</p>
         )}
+
+        <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-zinc-500">
+          Email thread
+        </h2>
+        <EmailThread messages={contact.emailThread} />
 
         <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-zinc-500">
           Timeline

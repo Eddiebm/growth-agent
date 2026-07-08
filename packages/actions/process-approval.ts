@@ -1,4 +1,5 @@
 import type { Db } from "../../apps/api/src/jobs/db.js";
+import { triggerOutreach } from "./trigger-outreach";
 
 export async function processApproval(
   db: Db,
@@ -51,14 +52,11 @@ export async function processApproval(
   await db.contacts.update(approval.contact_id, { status: "queued" });
   await db.campaignContacts.enroll(campaignId, approval.contact_id);
 
-  await db.jobs.enqueue({
-    jobType: "outreach",
-    payload: {
-      campaignId,
-      batchSize: 1,
-      dryRun: false,
-      contactIds: [approval.contact_id],
-    },
-    scheduledFor: new Date(),
+  await triggerOutreach(db, {
+    source: "approval",
+    batchSize: 1,
+    contactIds: [approval.contact_id],
+    campaignId,
+    triggerId: approvalId,
   });
 }

@@ -11,7 +11,7 @@ import {
 import { ApprovalQueue } from "@/components/approval-queue";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { GoalTracker } from "@/components/goal-tracker";
-import { KillSwitch } from "@/components/kill-switch";
+import { OutreachControls } from "@/components/outreach-controls";
 import { MetricsHeader } from "@/components/metrics-header";
 import { PipelineBoard } from "@/components/pipeline-board";
 import { ProductFilter } from "@/components/product-filter";
@@ -47,7 +47,11 @@ export default async function DashboardHomePage({ searchParams }: PageProps) {
               products={products.map((p) => ({ slug: p.slug, name: p.name }))}
               current={productSlug}
             />
-            <KillSwitch initialPaused={system.outreachPaused} />
+            <OutreachControls
+              initialPaused={system.outreachPaused}
+              initialMode={system.outreachMode}
+              queuedCount={system.queuedCount}
+            />
           </div>
         </div>
         <div className="grid gap-8 xl:grid-cols-[1fr_340px]">

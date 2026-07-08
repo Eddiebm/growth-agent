@@ -12,6 +12,7 @@ export type {
   DashboardMetrics,
   WeeklyMetrics,
   ProductRow,
+  EmailThreadMessage,
 } from "./queries";
 export type { GlobalCacDefaults } from "../../../../packages/economics/cac-defaults";
 export {

@@ -78,6 +78,12 @@ async function main(): Promise<void> {
       `;
       console.log(`✅ Daily send cap: ${cap?.value ?? "default (10)"}`);
 
+      const [mode] = await sql<{ value: string }[]>`
+        SELECT value FROM agent_memory WHERE namespace = 'system' AND key = 'outreach_mode'
+      `;
+      const outreachMode = mode?.value ?? process.env.OUTREACH_MODE ?? "triggered";
+      console.log(`✅ Outreach mode: ${outreachMode}`);
+
       const activeCount = await sql<{ count: string }[]>`
         SELECT COUNT(*)::text AS count FROM products WHERE status = 'active'
       `;

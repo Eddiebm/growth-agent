@@ -85,6 +85,18 @@ export interface ContactDetail {
   domain: string;
   icpScore: number | null;
   activities: ActivityRow[];
+  emailThread: EmailThreadMessage[];
+}
+
+export interface EmailThreadMessage {
+  id: string;
+  direction: "outbound" | "inbound";
+  subject: string;
+  body: string;
+  occurredAt: Date;
+  classification: string | null;
+  nextAction: string | null;
+  urgency: string | null;
 }
 
 export const PIPELINE_COLUMNS: { key: string; label: string; statuses: string[] }[] = [
@@ -394,12 +406,69 @@ export async function getContactById(id: string): Promise<ContactDetail | null> 
         subject: string | null;
         body: string | null;
         occurred_at: Date;
+        metadata: Record<string, unknown> | null;
       }[]
     >`
-      SELECT id, type::text AS type, agent_id, subject, body, occurred_at
+      SELECT id, type::text AS type, agent_id, subject, body, occurred_at, metadata
       FROM activities WHERE contact_id = ${id}
       ORDER BY occurred_at DESC LIMIT 30
     `;
+
+    const emailRows = await db.sql<
+      {
+        id: string;
+        direction: string;
+        subject: string;
+        body_text: string;
+        sent_at: Date | null;
+        replied_at: Date | null;
+        created_at: Date;
+      }[]
+    >`
+      SELECT id, direction, subject, body_text, sent_at, replied_at, created_at
+      FROM email_messages
+      WHERE contact_id = ${id}
+      ORDER BY COALESCE(sent_at, replied_at, created_at) ASC
+    `;
+
+    const replyActivities = contactActivities
+      .filter((a) => a.type === "email_replied")
+      .map((a) => ({
+        occurredAt: a.occurred_at,
+        classification:
+          typeof a.metadata?.classification === "string" ? a.metadata.classification : null,
+        nextAction:
+          typeof a.metadata?.nextAction === "string" ? a.metadata.nextAction : null,
+        urgency: typeof a.metadata?.urgency === "string" ? a.metadata.urgency : null,
+      }))
+      .sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+
+    let replyIdx = 0;
+    const emailThread: EmailThreadMessage[] = emailRows.map((row) => {
+      const occurredAt = row.sent_at ?? row.replied_at ?? row.created_at;
+      let classification: string | null = null;
+      let nextAction: string | null = null;
+      let urgency: string | null = null;
+
+      if (row.direction === "inbound" && replyIdx < replyActivities.length) {
+        const reply = replyActivities[replyIdx]!;
+        classification = reply.classification;
+        nextAction = reply.nextAction;
+        urgency = reply.urgency;
+        replyIdx += 1;
+      }
+
+      return {
+        id: row.id,
+        direction: row.direction as "outbound" | "inbound",
+        subject: row.subject,
+        body: row.body_text,
+        occurredAt,
+        classification,
+        nextAction,
+        urgency,
+      };
+    });
 
     return {
       id: row.id,
@@ -422,20 +491,42 @@ export async function getContactById(id: string): Promise<ContactDetail | null> 
         companyName: row.company_name,
         occurredAt: a.occurred_at,
       })),
+      emailThread,
     };
   } finally {
     await db.sql.end();
   }
 }
 
-export async function getSystemStatus(): Promise<{ outreachPaused: boolean }> {
+export async function getSystemStatus(): Promise<{
+  outreachPaused: boolean;
+  outreachMode: "automatic" | "triggered";
+  queuedCount: number;
+}> {
   const db = getDb();
   try {
     const [row] = await db.sql<{ value: boolean }[]>`
       SELECT value FROM agent_memory
       WHERE namespace = 'system' AND key = 'outreach_paused'
     `;
-    return { outreachPaused: row?.value === true };
+    const [modeRow] = await db.sql<{ value: string }[]>`
+      SELECT value FROM agent_memory
+      WHERE namespace = 'system' AND key = 'outreach_mode'
+    `;
+    const [queued] = await db.sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM contacts WHERE status = 'queued'
+    `;
+
+    const outreachMode =
+      modeRow?.value === "automatic" || modeRow?.value === "triggered"
+        ? modeRow.value
+        : "triggered";
+
+    return {
+      outreachPaused: row?.value === true,
+      outreachMode,
+      queuedCount: Number(queued?.count ?? 0),
+    };
   } finally {
     await db.sql.end();
   }

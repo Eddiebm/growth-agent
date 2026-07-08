@@ -301,11 +301,18 @@ export const ScoreLeadsJobPayloadSchema = z.object({
   minScore: z.number().int().min(0).max(100).default(60),
 });
 
+export const OutreachTriggerSchema = z.object({
+  source: z.enum(["manual", "approval", "reply_follow_up", "signup", "api", "cron"]),
+  id: z.string().optional(),
+  note: z.string().optional(),
+});
+
 export const OutreachJobPayloadSchema = z.object({
   campaignId: UuidSchema,
   batchSize: z.number().int().min(1).max(50).default(10),
   dryRun: z.boolean().default(false),
   contactIds: z.array(UuidSchema).optional(),
+  trigger: OutreachTriggerSchema.optional(),
 });
 
 export const ReplyTriageJobPayloadSchema = z.object({

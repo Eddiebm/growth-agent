@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { getDb } from "./db-singleton.js";
 import { handleResendWebhook, type ResendWebhookEvent } from "./jobs/integrations.js";
 import { handleSignup } from "../../../packages/actions/handle-signup.js";
-import { isOutreachPaused, setOutreachPaused } from "../../../packages/system-state/index.js";
+import { isOutreachPaused, getOutreachMode, setOutreachPaused } from "../../../packages/system-state/index.js";
 import { pollJobs, runDailyCron, runReplyTriageCron } from "./worker.js";
 
 function verifyCronAuth(c: { req: { header: (name: string) => string | undefined } }): boolean {
@@ -33,7 +33,8 @@ export function createApp(): Hono {
           const instance = getDb();
           await instance.sql`SELECT 1`;
           const paused = await isOutreachPaused(instance);
-          return { outreachPaused: paused, db: "ok" as const };
+          const outreachMode = await getOutreachMode(instance);
+          return { outreachPaused: paused, outreachMode, db: "ok" as const };
         })(),
         new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error("db_timeout")), 4_000);
@@ -98,11 +99,13 @@ export function createApp(): Hono {
   app.get("/api/system/status", async (c) => {
     const db = getDb();
     const paused = await isOutreachPaused(db);
+    const outreachMode = await getOutreachMode(db);
     const [jobs] = await db.sql<{ pending: string }[]>`
       SELECT COUNT(*)::text AS pending FROM jobs WHERE status = 'pending'
     `;
     return c.json({
       outreachPaused: paused,
+      outreachMode,
       pendingJobs: Number(jobs?.pending ?? 0),
     });
   });

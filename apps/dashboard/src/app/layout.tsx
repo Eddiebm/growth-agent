@@ -4,7 +4,7 @@ import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
   title: BRAND.name,
-  description: `${BRAND.tagline} — autonomous revenue for local service businesses`,
+  description: "AI phone coverage for HVAC shops — answers 24/7, books service calls, routes emergencies.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
