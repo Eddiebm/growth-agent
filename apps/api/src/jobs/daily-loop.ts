@@ -23,11 +23,6 @@ import type {
   ResearcherInput,
   ScoreLeadsJobPayload,
 } from "../../../../packages/schemas/index.js";
-import {
-  CopywriterOutputSchema,
-  LeadScorerOutputSchema,
-  ResearcherOutputSchema,
-} from "../../../../packages/schemas/index.js";
 import { checkPolicy } from "../../../../packages/policies/index.js";
 import {
   routeLeadToProduct,
@@ -147,7 +142,7 @@ export async function leadGenJob(
       companyName: prospect.companyName,
       jobId,
     };
-    const research = ResearcherOutputSchema.parse(await runAgent(db, researcherInput));
+    const research = await runAgent(db, researcherInput);
 
     await db.companies.update(company.id, {
       description: research.description,
@@ -263,7 +258,7 @@ export async function scoreLeadsJob(
       icpDocVersion: "1.0",
       jobId,
     };
-    const score = LeadScorerOutputSchema.parse(await runAgent(db, scorerInput));
+    const score = await runAgent(db, scorerInput);
 
     const combinedReasons = [...routeReasons, ...score.reasons].slice(0, 5);
 

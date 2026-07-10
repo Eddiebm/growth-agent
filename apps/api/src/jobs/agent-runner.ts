@@ -6,17 +6,16 @@ import { dirname } from "node:path";
 import type { AgentInput, AgentOutput } from "../../../../packages/schemas/index.js";
 import {
   AgentInputSchema,
-  CopywriterOutputSchema,
-  LeadScorerOutputSchema,
   QualifierOutputSchema,
-  ResearcherOutputSchema,
   StrategistOutputSchema,
 } from "../../../../packages/schemas/index.js";
 import type { Db } from "./db.js";
 import { loadDocs } from "./load-docs.js";
 import { llmComplete } from "./llm.js";
 import { coerceCopywriterOutput } from "./normalize-copywriter.js";
+import { coerceLeadScorerOutput } from "./normalize-lead-scorer.js";
 import { coerceReplyClassifierOutput } from "./normalize-reply-classifier.js";
+import { coerceResearcherOutput } from "./normalize-researcher.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = join(__dirname, "../../../../packages/schemas/examples");
@@ -51,11 +50,7 @@ export async function runAgent<T extends AgentInput>(
     responseFormat: "json",
   });
 
-  const output = parseAgentOutput(
-    parsed.agentId,
-    raw,
-    parsed.agentId === "reply_classifier" ? parsed.inboundBody : undefined,
-  );
+  const output = parseAgentOutput(parsed.agentId, raw, parsed);
 
   await db.auditLog.create({
     agentId: parsed.agentId,
@@ -79,17 +74,20 @@ export async function runAgent<T extends AgentInput>(
 function parseAgentOutput(
   agentId: AgentInput["agentId"],
   raw: { json: unknown },
-  inboundBody?: string,
+  input: AgentInput,
 ): AgentOutput {
   switch (agentId) {
     case "researcher":
-      return ResearcherOutputSchema.parse(raw.json);
+      return coerceResearcherOutput(raw.json, input);
     case "lead_scorer":
-      return LeadScorerOutputSchema.parse(raw.json);
+      return coerceLeadScorerOutput(raw.json);
     case "copywriter":
       return coerceCopywriterOutput(raw.json);
     case "reply_classifier":
-      return coerceReplyClassifierOutput(raw.json, inboundBody);
+      return coerceReplyClassifierOutput(
+        raw.json,
+        input.agentId === "reply_classifier" ? input.inboundBody : undefined,
+      );
     case "qualifier":
       return QualifierOutputSchema.parse(raw.json);
     case "strategist":
@@ -123,7 +121,12 @@ async function buildSystemPrompt(
     docs.RATE_CARD ?? "",
   ];
 
-  if (agentId === "reply_classifier" || agentId === "copywriter") {
+  if (
+    agentId === "reply_classifier" ||
+    agentId === "copywriter" ||
+    agentId === "researcher" ||
+    agentId === "lead_scorer"
+  ) {
     const exampleOutput = await loadExampleOutput(agentId);
     lines.push(
       "",
@@ -151,6 +154,27 @@ async function buildSystemPrompt(
       "- callToAction is required (one short sentence)",
       "- toneCheck must be { onBrand: boolean, issues: string[] }",
       "- Do NOT nest under email/draft/result — return flat JSON with bodyText, subject, callToAction, toneCheck",
+    );
+  }
+
+  if (agentId === "researcher") {
+    lines.push(
+      "",
+      "Rules:",
+      "- Return flat JSON with domain, companyName, industry, employeeCount, country, description, linkedinUrl, confidence",
+      "- description is required (1-3 sentences)",
+      "- confidence is a number 0-1",
+    );
+  }
+
+  if (agentId === "lead_scorer") {
+    lines.push(
+      "",
+      "Rules:",
+      "- companyScore is required (0-100 integer)",
+      "- fit must be one of: high, medium, low, disqualified",
+      "- reasons is a non-empty array of strings",
+      "- recommendedAction must be one of: enroll_outreach, nurture_only, skip, manual_review",
     );
   }
 
