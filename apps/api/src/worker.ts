@@ -30,6 +30,20 @@ export async function runDailyCron(db: Db): Promise<void> {
   await enqueueDailyJobs(db, DEFAULT_CAMPAIGN_ID);
 }
 
+/** Re-enqueue today's jobs if the 06:00 UTC cron was missed (Render free tier spin-down). */
+export async function ensureTodayJobsQueued(db: Db): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  const [row] = await db.sql<{ id: string }[]>`
+    SELECT id FROM jobs
+    WHERE idempotency_key = ${`lead_gen:${today}`}
+    LIMIT 1
+  `;
+  if (!row) {
+    console.log(`[cron] Missed daily enqueue for ${today} — catching up now`);
+    await runDailyCron(db);
+  }
+}
+
 export async function runReplyTriageCron(db: Db): Promise<void> {
   await db.jobs.enqueue({
     jobType: "reply_triage",

@@ -520,7 +520,7 @@ export async function getSystemStatus(): Promise<{
     const outreachMode =
       modeRow?.value === "automatic" || modeRow?.value === "triggered"
         ? modeRow.value
-        : "triggered";
+        : "automatic";
 
     return {
       outreachPaused: row?.value === true,

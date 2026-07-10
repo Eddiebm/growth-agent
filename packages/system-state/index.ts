@@ -36,7 +36,7 @@ export async function getOutreachMode(db: Db): Promise<OutreachMode> {
   if (row?.value === "automatic" || row?.value === "triggered") {
     return row.value;
   }
-  return process.env.OUTREACH_MODE === "automatic" ? "automatic" : "triggered";
+  return process.env.OUTREACH_MODE === "triggered" ? "triggered" : "automatic";
 }
 
 export async function setOutreachMode(db: Db, mode: OutreachMode): Promise<void> {

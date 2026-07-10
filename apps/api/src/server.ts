@@ -4,7 +4,13 @@ import { serve } from "@hono/node-server";
 import cron from "node-cron";
 import { createApp } from "./app.js";
 import { getDb } from "./db-singleton.js";
-import { pollJobs, runDailyCron, runReplyTriageCron, runWeeklyLearningCron } from "./worker.js";
+import {
+  ensureTodayJobsQueued,
+  pollJobs,
+  runDailyCron,
+  runReplyTriageCron,
+  runWeeklyLearningCron,
+} from "./worker.js";
 
 config({ path: resolve(process.cwd(), ".env") });
 
@@ -32,6 +38,7 @@ function startCron(): void {
 }
 
 startCron();
+void ensureTodayJobsQueued(db);
 setInterval(() => void pollJobs(db), POLL_MS);
 
 serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, () => {
