@@ -15,6 +15,7 @@ import {
 import type { Db } from "./db.js";
 import { loadDocs } from "./load-docs.js";
 import { llmComplete } from "./llm.js";
+import { coerceCopywriterOutput } from "./normalize-copywriter.js";
 import { coerceReplyClassifierOutput } from "./normalize-reply-classifier.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -86,7 +87,7 @@ function parseAgentOutput(
     case "lead_scorer":
       return LeadScorerOutputSchema.parse(raw.json);
     case "copywriter":
-      return CopywriterOutputSchema.parse(raw.json);
+      return coerceCopywriterOutput(raw.json);
     case "reply_classifier":
       return coerceReplyClassifierOutput(raw.json, inboundBody);
     case "qualifier":
@@ -122,18 +123,34 @@ async function buildSystemPrompt(
     docs.RATE_CARD ?? "",
   ];
 
-  if (agentId === "reply_classifier") {
-    const exampleOutput = await loadExampleOutput("reply_classifier");
+  if (agentId === "reply_classifier" || agentId === "copywriter") {
+    const exampleOutput = await loadExampleOutput(agentId);
     lines.push(
       "",
       "--- REQUIRED OUTPUT JSON (use these exact field names) ---",
       JSON.stringify(exampleOutput, null, 2),
+    );
+  }
+
+  if (agentId === "reply_classifier") {
+    lines.push(
       "",
       "Rules:",
       "- classification must be one of: interested, question, objection, not_now, referral, unsubscribe, auto_reply, bounce, spam, unknown",
       "- suggestedNextAction must be one of: book_meeting, send_follow_up, escalate_to_human, add_to_nurture, mark_lost, suppress, no_action",
       "- urgency must be one of: high, medium, low",
       "- Do NOT use keys like response, intent, or positive/negative as classification",
+    );
+  }
+
+  if (agentId === "copywriter") {
+    lines.push(
+      "",
+      "Rules:",
+      "- bodyText is required (plain text email body, 50+ chars)",
+      "- callToAction is required (one short sentence)",
+      "- toneCheck must be { onBrand: boolean, issues: string[] }",
+      "- Do NOT nest under email/draft/result — return flat JSON with bodyText, subject, callToAction, toneCheck",
     );
   }
 

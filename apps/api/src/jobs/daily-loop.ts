@@ -418,7 +418,7 @@ export async function outreachJob(
       priorMessages: [],
       jobId,
     };
-    const draft = CopywriterOutputSchema.parse(await runAgent(db, copyInput));
+    const draft = await runAgent(db, copyInput);
 
     const experimentId = await ensureSubjectLineExperiment(
       db,
