@@ -41,6 +41,23 @@ startCron();
 void ensureTodayJobsQueued(db);
 setInterval(() => void pollJobs(db), POLL_MS);
 
+// Keep Render free-tier awake so daily cron actually fires.
+// Render sets RENDER_EXTERNAL_URL; override with KEEP_ALIVE_URL if needed.
+const KEEP_ALIVE_MS = Number(process.env.KEEP_ALIVE_MS ?? 4 * 60 * 1000);
+const keepAliveUrl =
+  process.env.KEEP_ALIVE_URL ??
+  process.env.RENDER_EXTERNAL_URL ??
+  process.env.APP_URL;
+if (keepAliveUrl && process.env.KEEP_ALIVE !== "false") {
+  const health = `${keepAliveUrl.replace(/\/$/, "")}/health`;
+  setInterval(() => {
+    void fetch(health).catch((err) => {
+      console.warn(`[keepalive] ${health} failed:`, err instanceof Error ? err.message : err);
+    });
+  }, KEEP_ALIVE_MS);
+  console.log(`[keepalive] pinging ${health} every ${KEEP_ALIVE_MS / 1000}s`);
+}
+
 serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, () => {
   console.log(`[api] listening on http://0.0.0.0:${PORT}`);
   console.log(`[api] health → /health | webhook → /webhooks/resend`);

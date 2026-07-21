@@ -51,7 +51,11 @@ interface ContactsRepo {
   findByCompany(companyId: string): Promise<Contact[]>;
   findByEmail(email: string): Promise<Contact | null>;
   findQueuedForCampaign(campaignId: string, limit: number): Promise<Contact[]>;
+  /** Atomically claim queued contacts so parallel outreach jobs cannot double-send. */
+  claimQueuedForCampaign(campaignId: string, limit: number): Promise<Contact[]>;
   findQueuedByIds(campaignId: string, contactIds: string[]): Promise<Contact[]>;
+  /** Soft-claim a single contact; returns false if another worker already claimed it. */
+  tryClaimForSend(contactId: string): Promise<boolean>;
 }
 
 interface CampaignsRepo {
@@ -572,6 +576,7 @@ export function createDb(databaseUrl: string): Db {
     async findQueuedForCampaign(campaignId, limit) {
       // Honor the sequence step's delay_days so a contact who was just emailed
       // isn't immediately eligible for the next step in the same day.
+      // Also enforce a hard 20h cooldown so parallel jobs can't race.
       const rows = await sql<ContactRow[]>`
         SELECT c.* FROM contacts c
         INNER JOIN campaign_contacts cc ON cc.contact_id = c.id
@@ -585,10 +590,67 @@ export function createDb(databaseUrl: string): Db {
             c.last_contacted_at IS NULL
             OR c.last_contacted_at < now() - make_interval(days => GREATEST(COALESCE(s.delay_days, 0), 1))
           )
+          AND (
+            c.last_contacted_at IS NULL
+            OR c.last_contacted_at < now() - interval '20 hours'
+          )
         ORDER BY cc.enrolled_at ASC
         LIMIT ${limit}
       `;
       return rows.map(mapContact);
+    },
+
+    async claimQueuedForCampaign(campaignId, limit) {
+      // Lock + soft-claim in one transaction so two outreach workers can't
+      // pick the same contact (the race that caused same-day duplicate sends).
+      return sql.begin(async (tx) => {
+        const rows = await tx<ContactRow[]>`
+          SELECT c.* FROM contacts c
+          INNER JOIN campaign_contacts cc ON cc.contact_id = c.id
+          LEFT JOIN sequences s
+            ON s.campaign_id = cc.campaign_id AND s.step_number = cc.sequence_step
+          WHERE cc.campaign_id = ${campaignId}
+            AND c.status = 'queued'
+            AND NOT c.do_not_contact
+            AND cc.completed_at IS NULL
+            AND (
+              c.last_contacted_at IS NULL
+              OR c.last_contacted_at < now() - make_interval(days => GREATEST(COALESCE(s.delay_days, 0), 1))
+            )
+            AND (
+              c.last_contacted_at IS NULL
+              OR c.last_contacted_at < now() - interval '20 hours'
+            )
+          ORDER BY cc.enrolled_at ASC
+          LIMIT ${limit}
+          FOR UPDATE OF c SKIP LOCKED
+        `;
+        if (rows.length === 0) return [];
+
+        const ids = rows.map((r) => r.id);
+        await tx`
+          UPDATE contacts
+          SET last_contacted_at = now(), updated_at = now()
+          WHERE id = ANY(${ids}::uuid[])
+        `;
+        return rows.map(mapContact);
+      });
+    },
+
+    async tryClaimForSend(contactId) {
+      const rows = await sql<{ id: string }[]>`
+        UPDATE contacts
+        SET last_contacted_at = now(), updated_at = now()
+        WHERE id = ${contactId}
+          AND status = 'queued'
+          AND NOT do_not_contact
+          AND (
+            last_contacted_at IS NULL
+            OR last_contacted_at < now() - interval '20 hours'
+          )
+        RETURNING id
+      `;
+      return rows.length > 0;
     },
 
     async findQueuedByIds(campaignId, contactIds) {
@@ -600,6 +662,10 @@ export function createDb(databaseUrl: string): Db {
           AND c.id = ANY(${contactIds}::uuid[])
           AND c.status = 'queued'
           AND NOT c.do_not_contact
+          AND (
+            c.last_contacted_at IS NULL
+            OR c.last_contacted_at < now() - interval '20 hours'
+          )
       `;
       return rows.map(mapContact);
     },

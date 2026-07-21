@@ -8,6 +8,11 @@ export const notify = {
     console.log(`[notify:${channel}] → ${recipientId || "console"}\n${message}`);
   },
 
+  async opsAlert(message: string): Promise<void> {
+    const recipientId = process.env.OWNER_TELEGRAM_ID ?? "";
+    await notify.send("telegram", recipientId, message);
+  },
+
   async hotLead(input: {
     contactId: string;
     summary: string;

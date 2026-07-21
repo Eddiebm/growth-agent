@@ -38,6 +38,7 @@ import {
   enrichCompany,
   fetchInboundRepliesFromDb,
   sendEmail,
+  ensureResendDomainReady,
 } from "./integrations.js";
 import { notify } from "./notify.js";
 import {
@@ -352,12 +353,49 @@ export async function outreachJob(
     return;
   }
 
+  // Block sends if Resend domain drifted to failed; auto-reverify when possible.
+  try {
+    await ensureResendDomainReady();
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[outreach] Domain not ready: ${reason}`);
+    await notify.opsAlert(`🚫 Outreach blocked — ${reason}`);
+    await db.activities.create({
+      campaignId,
+      type: "policy_blocked",
+      agentId: "orchestrator",
+      jobId,
+      metadata: { reason: "resend_domain_not_ready", detail: reason },
+    });
+    throw err;
+  }
+
+  // Campaign-level advisory lock — only one outreach batch per campaign at a time.
+  const [lock] = await db.sql<{ ok: boolean }[]>`
+    SELECT pg_try_advisory_lock(hashtext(${`outreach:${campaignId}`})) AS ok
+  `;
+  if (!lock?.ok) {
+    console.log(`[outreach] Another batch holds lock for ${campaignId} — skipping`);
+    return;
+  }
+
+  try {
   const ctx = await db.policy.getContext();
   const contacts = contactIds?.length
     ? await db.contacts.findQueuedByIds(campaignId, contactIds)
-    : await db.contacts.findQueuedForCampaign(campaignId, batchSize);
+    : await db.contacts.claimQueuedForCampaign(campaignId, batchSize);
 
   for (const contact of contacts) {
+    // When contactIds were passed explicitly, claim one-by-one so a parallel
+    // batch can't also send to the same person.
+    if (contactIds?.length) {
+      const claimed = await db.contacts.tryClaimForSend(contact.id);
+      if (!claimed) {
+        console.log(`[outreach] Skip ${contact.email} — already claimed`);
+        continue;
+      }
+    }
+
     const isSuppressed = await db.suppression.hasDomain(contact.email.split("@")[1] ?? "");
     const contactCtx = {
       ...ctx,
@@ -502,6 +540,9 @@ export async function outreachJob(
 
     await incrementDailyEmailCounter(db);
     ctx.emailsSentToday += 1;
+  }
+  } finally {
+    await db.sql`SELECT pg_advisory_unlock(hashtext(${`outreach:${campaignId}`}))`;
   }
 }
 

@@ -222,6 +222,82 @@ function mockProspects(limit: number): Prospect[] {
 // Resend — outbound email
 // ---------------------------------------------------------------------------
 
+/**
+ * Extract the email domain from RESEND_FROM_EMAIL ("Alex <outreach@makola.org>").
+ */
+export function fromEmailDomain(from = process.env.RESEND_FROM_EMAIL ?? ""): string | null {
+  const match = from.match(/@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+interface ResendDomain {
+  id: string;
+  name: string;
+  status: string;
+}
+
+/**
+ * Ensure the sending domain is verified before outreach.
+ * If Resend marked it `failed`/`temporary_failure`, trigger a re-verify
+ * (DNS is often still correct — Resend just stopped checking).
+ */
+export async function ensureResendDomainReady(): Promise<{ domain: string; status: string }> {
+  if (isMockMode() || !process.env.RESEND_API_KEY) {
+    return { domain: "mock", status: "verified" };
+  }
+
+  const apiKey = requireEnv("RESEND_API_KEY");
+  const domain = fromEmailDomain();
+  if (!domain) {
+    throw new Error("RESEND_FROM_EMAIL missing or has no @domain");
+  }
+
+  const listRes = await fetch(`${RESEND_BASE}/domains`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (!listRes.ok) {
+    throw new Error(`Resend domains list failed (${listRes.status}): ${await listRes.text()}`);
+  }
+
+  const list = (await listRes.json()) as { data?: ResendDomain[] };
+  const entry = (list.data ?? []).find((d) => d.name.toLowerCase() === domain);
+  if (!entry) {
+    throw new Error(
+      `Resend domain ${domain} not found — add it at https://resend.com/domains`,
+    );
+  }
+
+  let status = entry.status;
+  if (status === "failed" || status === "temporary_failure" || status === "pending") {
+    console.log(`[resend] Domain ${domain} is ${status} — triggering verify`);
+    const verifyRes = await fetch(`${RESEND_BASE}/domains/${entry.id}/verify`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!verifyRes.ok) {
+      console.error(`[resend] Verify trigger failed: ${await verifyRes.text()}`);
+    } else {
+      // Give Resend a moment to re-check DNS
+      await new Promise((r) => setTimeout(r, 4_000));
+      const detailRes = await fetch(`${RESEND_BASE}/domains/${entry.id}`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (detailRes.ok) {
+        const detail = (await detailRes.json()) as ResendDomain;
+        status = detail.status;
+      }
+    }
+  }
+
+  if (status !== "verified" && status !== "partially_verified") {
+    throw new Error(
+      `Resend domain ${domain} is ${status} — fix DNS or re-verify at https://resend.com/domains`,
+    );
+  }
+
+  return { domain, status };
+}
+
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   if (isMockMode() || !process.env.RESEND_API_KEY) {
     const messageId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
