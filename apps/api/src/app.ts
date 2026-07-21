@@ -1,9 +1,18 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb } from "./db-singleton.js";
-import { handleResendWebhook, type ResendWebhookEvent } from "./jobs/integrations.js";
+import {
+  handleResendWebhook,
+  type ResendWebhookEvent,
+} from "./jobs/integrations.js";
 import { handleSignup } from "../../../packages/actions/handle-signup.js";
-import { isOutreachPaused, getOutreachMode, setOutreachPaused } from "../../../packages/system-state/index.js";
+import { forcePipeline } from "../../../packages/actions/force-pipeline.js";
+import { getResendDomainHealth } from "../../../packages/resend-health/index.js";
+import {
+  isOutreachPaused,
+  getOutreachMode,
+  setOutreachPaused,
+} from "../../../packages/system-state/index.js";
 import { pollJobs, runDailyCron, runReplyTriageCron } from "./worker.js";
 
 function verifyCronAuth(c: { req: { header: (name: string) => string | undefined } }): boolean {
@@ -103,11 +112,41 @@ export function createApp(): Hono {
     const [jobs] = await db.sql<{ pending: string }[]>`
       SELECT COUNT(*)::text AS pending FROM jobs WHERE status = 'pending'
     `;
+    const [queued] = await db.sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM contacts WHERE status = 'queued' AND NOT do_not_contact
+    `;
+    const today = new Date().toISOString().slice(0, 10);
+    const [sent] = await db.sql<{ count: string }[]>`
+      SELECT COALESCE(count, 0)::text AS count FROM daily_counters
+      WHERE counter_date = ${today}::date AND counter_key = 'emails_sent'
+    `;
+    const resend = await getResendDomainHealth();
     return c.json({
       outreachPaused: paused,
       outreachMode,
       pendingJobs: Number(jobs?.pending ?? 0),
+      queuedCount: Number(queued?.count ?? 0),
+      emailsSentToday: Number(sent?.count ?? 0),
+      resend,
     });
+  });
+
+  app.post("/api/system/force-run", async (c) => {
+    const db = getDb();
+    const apiKey = c.req.header("x-api-key");
+    if (process.env.WORKER_API_KEY && apiKey !== process.env.WORKER_API_KEY) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    const body = (await c.req.json().catch(() => ({}))) as {
+      batchSize?: number;
+      resetSendCounter?: boolean;
+    };
+    const result = await forcePipeline(db, {
+      batchSize: body.batchSize,
+      resetSendCounter: body.resetSendCounter,
+      note: "Force pipeline from API",
+    });
+    return c.json(result);
   });
 
   app.post("/api/system/kill-switch", async (c) => {

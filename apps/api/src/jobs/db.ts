@@ -1,5 +1,6 @@
 import postgres, { type JSONValue } from "postgres";
 import type { PolicyContext } from "../../../../packages/policies/index.js";
+import { normalizeOutreachEmail } from "../../../../packages/email-validation/index.js";
 import type {
   ActivityType,
   Campaign,
@@ -507,11 +508,16 @@ export function createDb(databaseUrl: string): Db {
     },
 
     async upsertByEmail(input) {
+      const email = normalizeOutreachEmail(input.email);
+      if (!email) {
+        throw new Error(`Invalid outreach email rejected: ${input.email}`);
+      }
+
       const [row] = await sql<ContactRow[]>`
         INSERT INTO contacts (company_id, email, first_name, last_name, title, phone, status)
         VALUES (
           ${input.companyId},
-          ${input.email},
+          ${email},
           ${input.firstName ?? null},
           ${input.lastName ?? null},
           ${input.title ?? null},

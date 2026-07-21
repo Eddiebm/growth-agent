@@ -51,6 +51,9 @@ export default async function DashboardHomePage({ searchParams }: PageProps) {
               initialPaused={system.outreachPaused}
               initialMode={system.outreachMode}
               queuedCount={system.queuedCount}
+              emailsSentToday={system.emailsSentToday}
+              pendingJobs={system.pendingJobs}
+              resend={system.resend}
             />
           </div>
         </div>

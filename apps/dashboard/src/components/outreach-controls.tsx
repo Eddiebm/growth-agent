@@ -7,18 +7,28 @@ interface OutreachControlsProps {
   initialPaused: boolean;
   initialMode: "automatic" | "triggered";
   queuedCount: number;
+  emailsSentToday: number;
+  pendingJobs: number;
+  resend: {
+    domain: string | null;
+    status: string;
+    detail?: string;
+  };
 }
 
 export function OutreachControls({
   initialPaused,
   initialMode,
   queuedCount,
+  emailsSentToday,
+  pendingJobs,
+  resend,
 }: OutreachControlsProps) {
   const router = useRouter();
   const [paused, setPaused] = useState(initialPaused);
   const [mode, setMode] = useState(initialMode);
-  const [loading, setLoading] = useState<"pause" | "mode" | "push" | null>(null);
-  const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState<"pause" | "mode" | "push" | "force" | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   async function togglePause() {
     setLoading("pause");
@@ -58,7 +68,7 @@ export function OutreachControls({
 
   async function pushBatch() {
     setLoading("push");
-    setPushMessage(null);
+    setMessage(null);
     try {
       const res = await fetch("/api/system/trigger-outreach", {
         method: "POST",
@@ -67,19 +77,68 @@ export function OutreachControls({
       });
       const data = (await res.json()) as { ok?: boolean; batchSize?: number; error?: string };
       if (res.ok && data.ok) {
-        setPushMessage(`Queued ${data.batchSize ?? 0} sends — worker picks up in ~5s`);
+        setMessage(`Queued ${data.batchSize ?? 0} sends — worker picks up in ~5s`);
         router.refresh();
       } else {
-        setPushMessage(data.error ?? "Push failed");
+        setMessage(data.error ?? "Push failed");
       }
     } finally {
       setLoading(null);
     }
   }
 
+  async function forceRun() {
+    if (
+      !window.confirm(
+        "Force today's pipeline now?\n\nThis re-queues lead gen, scoring, and outreach (up to 10 sends). Contacts emailed in the last 20h are skipped.",
+      )
+    ) {
+      return;
+    }
+    setLoading("force");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/system/force-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchSize: 10, resetSendCounter: true }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        today?: string;
+        jobs?: string[];
+        error?: string;
+      };
+      if (res.ok && data.ok) {
+        setMessage(`Forced ${data.today} — ${data.jobs?.length ?? 0} jobs queued`);
+        router.refresh();
+      } else {
+        setMessage(data.error ?? "Force run failed");
+      }
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  const resendOk = resend.status === "verified" || resend.status === "mock";
+  const resendLabel = resend.domain
+    ? `${resend.domain}: ${resend.status}`
+    : `resend: ${resend.status}`;
+
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <span
+          title={resend.detail ?? resendLabel}
+          className={`rounded-lg border px-3 py-2 text-xs font-medium ${
+            resendOk
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-red-500/40 bg-red-500/10 text-red-300"
+          }`}
+        >
+          {resendLabel}
+        </span>
+
         <button
           type="button"
           onClick={toggleMode}
@@ -120,13 +179,23 @@ export function OutreachControls({
             {loading === "push" ? "Pushing…" : `Push ${Math.min(queuedCount, 5)} now`}
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={forceRun}
+          disabled={loading !== null || paused || !resendOk}
+          className="rounded-lg border border-zinc-500/40 bg-zinc-800 px-4 py-2 text-xs font-semibold text-zinc-100 transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {loading === "force" ? "Forcing…" : "Force run"}
+        </button>
       </div>
 
-      <p className="max-w-xs text-right text-xs text-zinc-600">
+      <p className="max-w-md text-right text-xs text-zinc-600">
+        {queuedCount} queued · {emailsSentToday} sent today · {pendingJobs} jobs pending
         {mode === "triggered"
-          ? `${queuedCount} queued · cron won't send until you push`
-          : "Automatic · cron sends daily at 08:00 UTC"}
-        {pushMessage ? ` · ${pushMessage}` : ""}
+          ? " · cron won't send until you push"
+          : " · automatic 08:00 UTC"}
+        {message ? ` · ${message}` : ""}
       </p>
     </div>
   );

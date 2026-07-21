@@ -161,17 +161,26 @@ export async function leadGenJob(
       },
     });
 
-    // 4. Upsert primary contact
+    // 4. Upsert primary contact (reject scrape junk / image "emails")
     if (prospect.contactEmail) {
-      await db.contacts.upsertByEmail({
-        companyId: company.id,
-        email: prospect.contactEmail,
-        firstName: prospect.contactFirstName,
-        lastName: prospect.contactLastName,
-        title: prospect.contactTitle,
-        phone: prospect.contactPhone ?? null,
-        status: "enriched",
-      });
+      try {
+        await db.contacts.upsertByEmail({
+          companyId: company.id,
+          email: prospect.contactEmail,
+          firstName: prospect.contactFirstName,
+          lastName: prospect.contactLastName,
+          title: prospect.contactTitle,
+          phone: prospect.contactPhone ?? null,
+          status: "enriched",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Invalid outreach email")) {
+          console.warn(`[lead_gen] Skipping bad email for ${prospect.domain}: ${prospect.contactEmail}`);
+        } else {
+          throw err;
+        }
+      }
     }
 
     await db.activities.create({

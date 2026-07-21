@@ -1,5 +1,6 @@
 import type { JSONValue } from "postgres";
 import type { Db } from "../../apps/api/src/jobs/db.js";
+import { isValidOutreachEmail } from "../email-validation/index.js";
 
 export interface SignupInput {
   email: string;
@@ -22,6 +23,9 @@ function domainFromEmail(email: string): string {
 
 export async function handleSignup(db: Db, input: SignupInput): Promise<SignupResult> {
   const email = input.email.toLowerCase().trim();
+  if (!isValidOutreachEmail(email)) {
+    throw new Error("Invalid email address");
+  }
   const domain = domainFromEmail(email);
   const companyName = input.company?.trim() || domain.split(".")[0] || "Unknown";
 

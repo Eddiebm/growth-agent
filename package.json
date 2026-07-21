@@ -8,7 +8,7 @@
   "scripts": {
     "db:migrate": "tsx scripts/migrate.ts",
     "go-live:check": "tsx scripts/go-live-check.ts",
-    "jobs:force": "tsx scripts/force-run.ts --run",
+    "jobs:force": "tsx scripts/force-run.ts",
     "jobs:status": "tsx scripts/force-run.ts",
     "setup:makola": "tsx scripts/setup-makola.ts",
     "go-live:hero": "tsx scripts/go-live-hero.ts",

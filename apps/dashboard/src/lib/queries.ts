@@ -5,6 +5,7 @@ import {
   getGlobalCacDefaults as loadGlobalCacDefaults,
   type GlobalCacDefaults,
 } from "../../../../packages/economics/cac-defaults";
+import { getResendDomainHealth } from "../../../../packages/resend-health/index";
 
 export interface PipelineContact {
   id: string;
@@ -502,6 +503,13 @@ export async function getSystemStatus(): Promise<{
   outreachPaused: boolean;
   outreachMode: "automatic" | "triggered";
   queuedCount: number;
+  emailsSentToday: number;
+  pendingJobs: number;
+  resend: {
+    domain: string | null;
+    status: string;
+    detail?: string;
+  };
 }> {
   const db = getDb();
   try {
@@ -514,7 +522,15 @@ export async function getSystemStatus(): Promise<{
       WHERE namespace = 'system' AND key = 'outreach_mode'
     `;
     const [queued] = await db.sql<{ count: string }[]>`
-      SELECT COUNT(*)::text AS count FROM contacts WHERE status = 'queued'
+      SELECT COUNT(*)::text AS count FROM contacts WHERE status = 'queued' AND NOT do_not_contact
+    `;
+    const today = new Date().toISOString().slice(0, 10);
+    const [sent] = await db.sql<{ count: string }[]>`
+      SELECT COALESCE(count, 0)::text AS count FROM daily_counters
+      WHERE counter_date = ${today}::date AND counter_key = 'emails_sent'
+    `;
+    const [jobs] = await db.sql<{ pending: string }[]>`
+      SELECT COUNT(*)::text AS pending FROM jobs WHERE status = 'pending'
     `;
 
     const outreachMode =
@@ -522,10 +538,15 @@ export async function getSystemStatus(): Promise<{
         ? modeRow.value
         : "automatic";
 
+    const resend = await getResendDomainHealth();
+
     return {
       outreachPaused: row?.value === true,
       outreachMode,
       queuedCount: Number(queued?.count ?? 0),
+      emailsSentToday: Number(sent?.count ?? 0),
+      pendingJobs: Number(jobs?.pending ?? 0),
+      resend,
     };
   } finally {
     await db.sql.end();

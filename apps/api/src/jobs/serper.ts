@@ -34,17 +34,13 @@ const TARGET_CITIES = [
   "Jacksonville FL",
 ];
 
+import { isValidOutreachEmail } from "../../../../packages/email-validation/index.js";
+
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-const SKIP_EMAIL_PATTERNS = [
-  "example.com",
-  "sentry",
-  "wixpress",
-  "godaddy",
-  ".png",
-  ".jpg",
-  ".gif",
-  ".webp",
-];
+
+function isUsableContactEmail(email: string, _domain: string): boolean {
+  return isValidOutreachEmail(email);
+}
 
 interface SerperPlace {
   title?: string;
@@ -105,10 +101,7 @@ async function fetchWithTimeout(url: string): Promise<string | null> {
 
 function extractEmail(html: string, domain: string): string | null {
   const matches = html.match(EMAIL_RE) ?? [];
-  const usable = matches.filter((email) => {
-    const lower = email.toLowerCase();
-    return !SKIP_EMAIL_PATTERNS.some((p) => lower.includes(p));
-  });
+  const usable = matches.filter((email) => isUsableContactEmail(email, domain));
   if (usable.length === 0) return null;
 
   // Prefer an email on the business's own domain
