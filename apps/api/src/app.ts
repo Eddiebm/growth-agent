@@ -14,6 +14,12 @@ import {
   setOutreachPaused,
 } from "../../../packages/system-state/index.js";
 import { pollJobs, runDailyCron, runReplyTriageCron } from "./worker.js";
+import {
+  parseVapiWebhook,
+  estimateCostCents,
+  dispositionSuggestsBooked,
+} from "../../../packages/vapi/webhook.js";
+import { proposeMeeting, confirmMeeting } from "../../../packages/calendar/booking.js";
 
 function verifyCronAuth(c: { req: { header: (name: string) => string | undefined } }): boolean {
   const secret = process.env.CRON_SECRET;
@@ -83,6 +89,164 @@ export function createApp(): Hono {
     const event = (await c.req.json()) as ResendWebhookEvent;
     await handleResendWebhook(db, event);
     return c.json({ received: true });
+  });
+
+  app.post("/webhooks/vapi", async (c) => {
+    const secret = process.env.VAPI_WEBHOOK_SECRET;
+    if (secret) {
+      const auth = c.req.header("authorization");
+      if (auth !== `Bearer ${secret}`) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+    }
+
+    const db = getDb();
+    const body = await c.req.json();
+    const parsed = parseVapiWebhook(body);
+
+    if (!parsed.callId) {
+      return c.json({ received: true, ignored: true, reason: "no_call_id" });
+    }
+
+    const costCents =
+      parsed.costCents ?? estimateCostCents(parsed.durationSeconds);
+
+    let call = await db.voiceCalls.updateByProviderCallId(parsed.callId, {
+      status: parsed.status,
+      disposition: parsed.disposition,
+      summary: parsed.summary,
+      recordingUrl: parsed.recordingUrl,
+      transcriptExcerpt: parsed.transcriptExcerpt,
+      durationSeconds: parsed.durationSeconds,
+      costCents,
+      startedAt: parsed.startedAt ? new Date(parsed.startedAt) : null,
+      endedAt: parsed.endedAt ? new Date(parsed.endedAt) : new Date(),
+      contactId: parsed.contactId,
+      campaignId: parsed.campaignId,
+      fromNumber: parsed.fromNumber,
+      toNumber: parsed.customerNumber,
+      metadata: {
+        endedReason: parsed.endedReason,
+        eventType: parsed.eventType,
+      },
+    });
+
+    if (!call) {
+      call = await db.voiceCalls.create({
+        providerCallId: parsed.callId,
+        contactId: parsed.contactId,
+        campaignId: parsed.campaignId,
+        fromNumber: parsed.fromNumber,
+        toNumber: parsed.customerNumber,
+        status: parsed.status,
+        disposition: parsed.disposition,
+        summary: parsed.summary,
+        recordingUrl: parsed.recordingUrl,
+        transcriptExcerpt: parsed.transcriptExcerpt,
+        durationSeconds: parsed.durationSeconds,
+        costCents,
+        startedAt: parsed.startedAt ? new Date(parsed.startedAt) : null,
+        endedAt: parsed.endedAt ? new Date(parsed.endedAt) : new Date(),
+        metadata: {
+          endedReason: parsed.endedReason,
+          eventType: parsed.eventType,
+        },
+      });
+    }
+
+    if (parsed.contactId) {
+      const noteBody = [
+        parsed.disposition ? `Disposition: ${parsed.disposition}` : null,
+        parsed.summary,
+      ]
+        .filter(Boolean)
+        .join("\n") || "Voice call completed";
+
+      await db.activities.create({
+        contactId: parsed.contactId,
+        campaignId: parsed.campaignId ?? undefined,
+        type: "call_completed",
+        channel: "voice",
+        agentId: "vapi",
+        externalId: parsed.callId,
+        subject: parsed.disposition ?? "Voice call",
+        body: noteBody,
+        metadata: {
+          disposition: parsed.disposition,
+          durationSeconds: parsed.durationSeconds,
+          costCents,
+          recordingUrl: parsed.recordingUrl,
+          voiceCallId: call.id,
+          endedReason: parsed.endedReason,
+        },
+      });
+
+      await db.contacts.update(parsed.contactId, {
+        metadata: {
+          lastVoiceDisposition: parsed.disposition,
+          lastVoiceCallAt: new Date().toISOString(),
+          lastVoiceCallId: parsed.callId,
+          lastVoiceSummary: parsed.summary,
+        },
+      });
+
+      if (
+        parsed.status === "completed" &&
+        dispositionSuggestsBooked(parsed.disposition)
+      ) {
+        try {
+          const contact = await db.contacts.get(parsed.contactId);
+          await proposeMeeting(db.sql as never, {
+            contactId: parsed.contactId,
+            companyId: contact.companyId,
+            campaignId: parsed.campaignId,
+            bookingUrl: process.env.CALCOM_BOOKING_URL,
+            source: "vapi_end_of_call",
+          });
+        } catch (err) {
+          console.warn("[vapi-webhook] proposeMeeting failed", err);
+        }
+      }
+    }
+
+    return c.json({ received: true, callId: call.id, status: call.status });
+  });
+
+  app.post("/api/meetings/propose", async (c) => {
+    const db = getDb();
+    const body = (await c.req.json()) as {
+      contactId?: string;
+      companyId?: string;
+      campaignId?: string;
+      bookingUrl?: string;
+      source?: string;
+    };
+    if (!body.contactId) return c.json({ error: "contactId required" }, 400);
+    const result = await proposeMeeting(db.sql as never, {
+      contactId: body.contactId,
+      companyId: body.companyId,
+      campaignId: body.campaignId,
+      bookingUrl: body.bookingUrl ?? process.env.CALCOM_BOOKING_URL,
+      source: body.source ?? "api",
+    });
+    return c.json(result);
+  });
+
+  app.post("/api/meetings/:id/confirm", async (c) => {
+    const db = getDb();
+    const meetingId = c.req.param("id");
+    const body = (await c.req.json().catch(() => ({}))) as {
+      providerEventId?: string;
+      meetingUrl?: string;
+      scheduledAt?: string;
+    };
+    const result = await confirmMeeting(db.sql as never, {
+      meetingId,
+      providerEventId: body.providerEventId,
+      meetingUrl: body.meetingUrl,
+      scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : undefined,
+    });
+    return c.json(result);
   });
 
   app.post("/api/signup", async (c) => {

@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
+  transpilePackages: [],
+  webpack: (webpackConfig) => {
+    webpackConfig.resolve = webpackConfig.resolve ?? {};
+    webpackConfig.resolve.extensionAlias = {
+      ".js": [".ts", ".tsx", ".js", ".jsx"],
+      ".mjs": [".mts", ".mjs"],
+    };
+    return webpackConfig;
+  },
 };
 
 export default nextConfig;

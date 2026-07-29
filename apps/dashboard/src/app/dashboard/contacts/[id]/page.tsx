@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getContactById } from "@/lib/db";
+import { getContactById, getVoiceCallsByContact } from "@/lib/db";
+import { CallsPanel } from "@/components/calls-panel";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { EmailThread } from "@/components/email-thread";
 
@@ -12,7 +13,10 @@ export default async function ContactPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const contact = await getContactById(id);
+  const [contact, voiceCalls] = await Promise.all([
+    getContactById(id),
+    getVoiceCallsByContact(id, 20),
+  ]);
   if (!contact) notFound();
 
   const name =
@@ -55,6 +59,13 @@ export default async function ContactPage({
           Email thread
         </h2>
         <EmailThread messages={contact.emailThread} />
+
+        <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-zinc-500">
+          Voice calls
+        </h2>
+        <div className="mt-4">
+          <CallsPanel calls={voiceCalls} />
+        </div>
 
         <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-zinc-500">
           Timeline

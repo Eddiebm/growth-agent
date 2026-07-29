@@ -3,18 +3,21 @@ import {
   getMetrics,
   getPendingApprovals,
   getPipelineContacts,
+  getRecentVoiceCalls,
   getSystemStatus,
   getWeeklyMetrics,
   groupContactsByColumn,
   PIPELINE_COLUMNS,
 } from "@/lib/db";
 import { ApprovalQueue } from "@/components/approval-queue";
+import { CallsPanel } from "@/components/calls-panel";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { GoalTracker } from "@/components/goal-tracker";
 import { OutreachControls } from "@/components/outreach-controls";
 import { MetricsHeader } from "@/components/metrics-header";
 import { PipelineBoard } from "@/components/pipeline-board";
 import { ProductFilter } from "@/components/product-filter";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +28,16 @@ interface PageProps {
 export default async function DashboardHomePage({ searchParams }: PageProps) {
   const { product: productSlug } = await searchParams;
 
-  const [contacts, approvals, metrics, weekly, system, products] = await Promise.all([
-    getPipelineContacts(productSlug),
-    getPendingApprovals(),
-    getMetrics(),
-    getWeeklyMetrics(),
-    getSystemStatus(),
-    getActiveProducts(),
-  ]);
+  const [contacts, approvals, metrics, weekly, system, products, recentCalls] =
+    await Promise.all([
+      getPipelineContacts(productSlug),
+      getPendingApprovals(),
+      getMetrics(),
+      getWeeklyMetrics(),
+      getSystemStatus(),
+      getActiveProducts(),
+      getRecentVoiceCalls(5),
+    ]);
 
   const grouped = groupContactsByColumn(contacts);
 
@@ -58,7 +63,20 @@ export default async function DashboardHomePage({ searchParams }: PageProps) {
           </div>
         </div>
         <div className="grid gap-8 xl:grid-cols-[1fr_340px]">
-          <PipelineBoard columns={PIPELINE_COLUMNS} grouped={grouped} />
+          <div className="space-y-8">
+            <PipelineBoard columns={PIPELINE_COLUMNS} grouped={grouped} />
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-medium uppercase tracking-wide text-zinc-500">
+                  Recent voice calls
+                </h2>
+                <Link href="/dashboard/calls" className="text-sm text-accent hover:underline">
+                  View all →
+                </Link>
+              </div>
+              <CallsPanel calls={recentCalls} />
+            </section>
+          </div>
           <div className="space-y-6">
             <GoalTracker weekly={weekly} />
             <ApprovalQueue approvals={approvals} />

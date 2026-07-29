@@ -123,3 +123,10 @@ export async function createOutboundCall(input: CreateOutboundCallInput): Promis
   const data = (await res.json()) as { id: string };
   return data.id;
 }
+
+export {
+  parseVapiWebhook,
+  estimateCostCents,
+  dispositionSuggestsBooked,
+  type ParsedVapiWebhook,
+} from "./webhook.js";

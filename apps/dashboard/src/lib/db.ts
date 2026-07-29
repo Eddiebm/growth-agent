@@ -13,6 +13,8 @@ export type {
   WeeklyMetrics,
   ProductRow,
   EmailThreadMessage,
+  VoiceCallRow,
+  VoiceCostMetrics,
 } from "./queries";
 export type { GlobalCacDefaults } from "../../../../packages/economics/cac-defaults";
 export {
@@ -28,6 +30,9 @@ export {
   getActiveProducts,
   getGlobalCacDefaults,
   getRepoIntelligenceProducts,
+  getRecentVoiceCalls,
+  getVoiceCostMetrics,
+  getVoiceCallsByContact,
   groupContactsByColumn,
   PIPELINE_COLUMNS,
 } from "./queries";

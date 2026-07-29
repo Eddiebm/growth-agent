@@ -567,3 +567,190 @@ export function groupContactsByColumn(
   }
   return grouped;
 }
+
+export interface VoiceCallRow {
+  id: string;
+  contactEmail: string | null;
+  contactName: string | null;
+  companyName: string | null;
+  status: string;
+  disposition: string | null;
+  durationSeconds: number | null;
+  costCents: number | null;
+  recordingUrl: string | null;
+  summary: string | null;
+  fromNumber: string | null;
+  toNumber: string | null;
+  createdAt: Date;
+}
+
+export interface VoiceCostMetrics {
+  callsToday: number;
+  completedToday: number;
+  durationSecondsToday: number;
+  costCentsToday: number;
+  costPerCompletedCents: number | null;
+}
+
+function estimateCallCostCents(durationSeconds: number | null, costCents: number | null): number {
+  if (costCents != null) return costCents;
+  if (durationSeconds == null || durationSeconds <= 0) return 0;
+  const perMin = Number(process.env.VAPI_COST_PER_MIN_CENTS ?? 15);
+  return Math.ceil((durationSeconds / 60) * perMin);
+}
+
+export async function getRecentVoiceCalls(limit = 50): Promise<VoiceCallRow[]> {
+  const db = getDb();
+  try {
+    const rows = await db.sql<
+      {
+        id: string;
+        status: string;
+        disposition: string | null;
+        duration_seconds: number | null;
+        cost_cents: number | null;
+        recording_url: string | null;
+        summary: string | null;
+        from_number: string | null;
+        to_number: string | null;
+        created_at: Date;
+        contact_email: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        company_name: string | null;
+      }[]
+    >`
+      SELECT
+        v.id, v.status, v.disposition, v.duration_seconds, v.cost_cents,
+        v.recording_url, v.summary, v.from_number, v.to_number, v.created_at,
+        ct.email AS contact_email, ct.first_name, ct.last_name,
+        co.name AS company_name
+      FROM voice_calls v
+      LEFT JOIN contacts ct ON ct.id = v.contact_id
+      LEFT JOIN companies co ON co.id = v.company_id
+      ORDER BY v.created_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      contactEmail: r.contact_email,
+      contactName: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
+      companyName: r.company_name,
+      status: r.status,
+      disposition: r.disposition,
+      durationSeconds: r.duration_seconds,
+      costCents: estimateCallCostCents(r.duration_seconds, r.cost_cents),
+      recordingUrl: r.recording_url,
+      summary: r.summary,
+      fromNumber: r.from_number,
+      toNumber: r.to_number,
+      createdAt: r.created_at,
+    }));
+  } catch {
+    // Table may not exist until migration 009 runs
+    return [];
+  } finally {
+    await db.sql.end();
+  }
+}
+
+export async function getVoiceCostMetrics(): Promise<VoiceCostMetrics> {
+  const db = getDb();
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = await db.sql<
+      {
+        status: string;
+        duration_seconds: number | null;
+        cost_cents: number | null;
+      }[]
+    >`
+      SELECT status, duration_seconds, cost_cents
+      FROM voice_calls
+      WHERE created_at::date = ${today}::date
+    `;
+    const callsToday = rows.length;
+    const completed = rows.filter((r) => r.status === "completed");
+    const durationSecondsToday = rows.reduce((sum, r) => sum + (r.duration_seconds ?? 0), 0);
+    const costCentsToday = rows.reduce(
+      (sum, r) => sum + estimateCallCostCents(r.duration_seconds, r.cost_cents),
+      0,
+    );
+    return {
+      callsToday,
+      completedToday: completed.length,
+      durationSecondsToday,
+      costCentsToday,
+      costPerCompletedCents:
+        completed.length > 0 ? Math.round(costCentsToday / completed.length) : null,
+    };
+  } catch {
+    return {
+      callsToday: 0,
+      completedToday: 0,
+      durationSecondsToday: 0,
+      costCentsToday: 0,
+      costPerCompletedCents: null,
+    };
+  } finally {
+    await db.sql.end();
+  }
+}
+
+export async function getVoiceCallsByContact(
+  contactId: string,
+  limit = 20,
+): Promise<VoiceCallRow[]> {
+  const db = getDb();
+  try {
+    const rows = await db.sql<
+      {
+        id: string;
+        status: string;
+        disposition: string | null;
+        duration_seconds: number | null;
+        cost_cents: number | null;
+        recording_url: string | null;
+        summary: string | null;
+        from_number: string | null;
+        to_number: string | null;
+        created_at: Date;
+        contact_email: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        company_name: string | null;
+      }[]
+    >`
+      SELECT
+        v.id, v.status, v.disposition, v.duration_seconds, v.cost_cents,
+        v.recording_url, v.summary, v.from_number, v.to_number, v.created_at,
+        ct.email AS contact_email, ct.first_name, ct.last_name,
+        co.name AS company_name
+      FROM voice_calls v
+      LEFT JOIN contacts ct ON ct.id = v.contact_id
+      LEFT JOIN companies co ON co.id = v.company_id
+      WHERE v.contact_id = ${contactId}
+      ORDER BY v.created_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map((r) => ({
+      id: r.id,
+      contactEmail: r.contact_email,
+      contactName: [r.first_name, r.last_name].filter(Boolean).join(" ") || null,
+      companyName: r.company_name,
+      status: r.status,
+      disposition: r.disposition,
+      durationSeconds: r.duration_seconds,
+      costCents: estimateCallCostCents(r.duration_seconds, r.cost_cents),
+      recordingUrl: r.recording_url,
+      summary: r.summary,
+      fromNumber: r.from_number,
+      toNumber: r.to_number,
+      createdAt: r.created_at,
+    }));
+  } catch {
+    return [];
+  } finally {
+    await db.sql.end();
+  }
+}

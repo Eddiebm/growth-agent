@@ -51,6 +51,7 @@ import {
 } from "../../../../packages/learning/index.js";
 import { buildEmailFooter } from "../../../../packages/vapi/demo-lines.js";
 import { warmFollowUpCall } from "../../../../packages/vapi/warm-call.js";
+import { proposeMeeting } from "../../../../packages/calendar/booking.js";
 import type { Company, Contact } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -862,6 +863,27 @@ async function maybeWarmFollowUpCall(
     },
   });
 
+  if (result.callId) {
+    try {
+      await db.voiceCalls.create({
+        contactId: input.contact.id,
+        companyId: input.company.id,
+        campaignId: input.campaignId,
+        providerCallId: result.callId,
+        fromNumber: result.demoLine?.number ?? null,
+        toNumber: input.contact.phone,
+        status: "initiated",
+        intent: "warm_sales_follow_up",
+        metadata: {
+          reason: "warm_reply_book_meeting",
+          summary: input.summary ?? null,
+        },
+      });
+    } catch (err) {
+      console.warn("[voice] failed to persist voice_calls row", err);
+    }
+  }
+
   await db.activities.create({
     contactId: input.contact.id,
     companyId: input.company.id,
@@ -870,12 +892,26 @@ async function maybeWarmFollowUpCall(
     agentId: "orchestrator",
     jobId: input.jobId,
     externalId: result.callId,
+    body: `Warm voice follow-up placed${result.demoLine?.number ? ` from ${result.demoLine.number}` : ""}`,
     metadata: {
       channel: "voice",
       fromNumber: result.demoLine?.number,
       reason: "warm_reply_book_meeting",
     },
   });
+
+  try {
+    await proposeMeeting(db.sql as never, {
+      contactId: input.contact.id,
+      companyId: input.company.id,
+      campaignId: input.campaignId,
+      bookingUrl: process.env.CALCOM_BOOKING_URL,
+      source: "warm_reply",
+      jobId: input.jobId,
+    });
+  } catch (err) {
+    console.warn("[calendar] proposeMeeting soft-fail", err);
+  }
 }
 
 function cronNext(_expr: string): Date {

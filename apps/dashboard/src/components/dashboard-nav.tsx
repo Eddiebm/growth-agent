@@ -3,6 +3,7 @@ import { BRAND } from "@/lib/brand";
 
 const links = [
   { href: "/dashboard", label: "Pipeline" },
+  { href: "/dashboard/calls", label: "Calls" },
   { href: "/dashboard/products", label: "Products" },
   { href: "/dashboard/cac", label: "CAC" },
   { href: "/dashboard/repo-intelligence", label: "Repos" },

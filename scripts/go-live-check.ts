@@ -15,6 +15,12 @@ const REQUIRED_LIVE = [
   "RESEND_FROM_EMAIL",
 ] as const;
 
+const OPTIONAL_VOICE = [
+  "VAPI_API_KEY",
+  "VAPI_SALES_ASSISTANT_ID",
+  "VAPI_PHONE_NUMBER_ID",
+] as const;
+
 async function main(): Promise<void> {
   const mock = process.env.MOCK_INTEGRATIONS === "true";
   const hero = getHeroProductSlug();
@@ -52,8 +58,39 @@ async function main(): Promise<void> {
       console.log("❌ Lead source — set SERPER_API_KEY or APOLLO_API_KEY");
       failed += 1;
     }
+
+    console.log("\nVoice (warm follow-up — optional but recommended):");
+    for (const key of OPTIONAL_VOICE) {
+      if (!process.env[key]) {
+        console.log(`⚠️  ${key} — missing (warm Vapi calls will stay mock/skipped)`);
+      } else {
+        console.log(`✅ ${key}`);
+      }
+    }
+    if (process.env.VAPI_WEBHOOK_SECRET) {
+      console.log("✅ VAPI_WEBHOOK_SECRET");
+    } else {
+      console.log("⚠️  VAPI_WEBHOOK_SECRET — set so /webhooks/vapi can verify signatures");
+    }
+    if (process.env.CALCOM_BOOKING_URL) {
+      console.log(`✅ CALCOM_BOOKING_URL=${process.env.CALCOM_BOOKING_URL}`);
+    } else {
+      console.log("⚠️  CALCOM_BOOKING_URL — booking links will use generic cal.com");
+    }
   } else {
     console.log("\n⏭️  Skipping Resend/Serper/OpenRouter (MOCK_INTEGRATIONS=true)");
+  }
+
+  // Public site reachability (best-effort)
+  try {
+    const res = await fetch("https://makola.org", { method: "HEAD", redirect: "follow" });
+    if (res.ok) {
+      console.log(`\n✅ https://makola.org → HTTP ${res.status}`);
+    } else {
+      console.log(`\n⚠️  https://makola.org → HTTP ${res.status} (check Deployment Protection)`);
+    }
+  } catch (err) {
+    console.log(`\n⚠️  https://makola.org unreachable: ${err instanceof Error ? err.message : err}`);
   }
 
   const url = process.env.DATABASE_URL;

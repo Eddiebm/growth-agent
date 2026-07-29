@@ -35,6 +35,73 @@ export interface Db {
   policy: PolicyRepo;
   metrics: MetricsRepo;
   auditLog: AuditLogRepo;
+  voiceCalls: VoiceCallsRepo;
+}
+
+export interface VoiceCallRecord {
+  id: string;
+  contactId: string | null;
+  companyId: string | null;
+  campaignId: string | null;
+  provider: string;
+  providerCallId: string | null;
+  direction: string;
+  intent: string;
+  fromNumber: string | null;
+  toNumber: string | null;
+  status: string;
+  disposition: string | null;
+  summary: string | null;
+  recordingUrl: string | null;
+  transcriptExcerpt: string | null;
+  durationSeconds: number | null;
+  costCents: number | null;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+}
+
+interface VoiceCallsRepo {
+  create(input: CreateVoiceCallInput): Promise<VoiceCallRecord>;
+  updateByProviderCallId(
+    providerCallId: string,
+    patch: Partial<CreateVoiceCallInput> & {
+      status?: string;
+      disposition?: string | null;
+      summary?: string | null;
+      recordingUrl?: string | null;
+      transcriptExcerpt?: string | null;
+      durationSeconds?: number | null;
+      costCents?: number | null;
+      startedAt?: Date | null;
+      endedAt?: Date | null;
+    },
+  ): Promise<VoiceCallRecord | null>;
+  listRecent(limit?: number): Promise<VoiceCallRecord[]>;
+  listByContact(contactId: string, limit?: number): Promise<VoiceCallRecord[]>;
+}
+
+interface CreateVoiceCallInput {
+  contactId?: string | null;
+  companyId?: string | null;
+  campaignId?: string | null;
+  provider?: string;
+  providerCallId?: string | null;
+  direction?: string;
+  intent?: string;
+  fromNumber?: string | null;
+  toNumber?: string | null;
+  status?: string;
+  disposition?: string | null;
+  summary?: string | null;
+  recordingUrl?: string | null;
+  transcriptExcerpt?: string | null;
+  durationSeconds?: number | null;
+  costCents?: number | null;
+  startedAt?: Date | null;
+  endedAt?: Date | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface CompaniesRepo {
@@ -1300,6 +1367,135 @@ export function createDb(databaseUrl: string): Db {
     },
   };
 
+  function mapVoiceCall(row: {
+    id: string;
+    contact_id: string | null;
+    company_id: string | null;
+    campaign_id: string | null;
+    provider: string;
+    provider_call_id: string | null;
+    direction: string;
+    intent: string;
+    from_number: string | null;
+    to_number: string | null;
+    status: string;
+    disposition: string | null;
+    summary: string | null;
+    recording_url: string | null;
+    transcript_excerpt: string | null;
+    duration_seconds: number | null;
+    cost_cents: number | null;
+    started_at: Date | null;
+    ended_at: Date | null;
+    metadata: Record<string, unknown> | null;
+    created_at: Date;
+  }): VoiceCallRecord {
+    return {
+      id: row.id,
+      contactId: row.contact_id,
+      companyId: row.company_id,
+      campaignId: row.campaign_id,
+      provider: row.provider,
+      providerCallId: row.provider_call_id,
+      direction: row.direction,
+      intent: row.intent,
+      fromNumber: row.from_number,
+      toNumber: row.to_number,
+      status: row.status,
+      disposition: row.disposition,
+      summary: row.summary,
+      recordingUrl: row.recording_url,
+      transcriptExcerpt: row.transcript_excerpt,
+      durationSeconds: row.duration_seconds,
+      costCents: row.cost_cents,
+      startedAt: row.started_at,
+      endedAt: row.ended_at,
+      metadata: (row.metadata ?? {}) as Record<string, unknown>,
+      createdAt: row.created_at,
+    };
+  }
+
+  const voiceCalls: VoiceCallsRepo = {
+    async create(input) {
+      const [row] = await sql<Parameters<typeof mapVoiceCall>[0][]>`
+        INSERT INTO voice_calls (
+          contact_id, company_id, campaign_id, provider, provider_call_id,
+          direction, intent, from_number, to_number, status, disposition,
+          summary, recording_url, transcript_excerpt, duration_seconds, cost_cents,
+          started_at, ended_at, metadata
+        ) VALUES (
+          ${input.contactId ?? null},
+          ${input.companyId ?? null},
+          ${input.campaignId ?? null},
+          ${input.provider ?? "vapi"},
+          ${input.providerCallId ?? null},
+          ${input.direction ?? "outbound"},
+          ${input.intent ?? "warm_sales_follow_up"},
+          ${input.fromNumber ?? null},
+          ${input.toNumber ?? null},
+          ${input.status ?? "initiated"},
+          ${input.disposition ?? null},
+          ${input.summary ?? null},
+          ${input.recordingUrl ?? null},
+          ${input.transcriptExcerpt ?? null},
+          ${input.durationSeconds ?? null},
+          ${input.costCents ?? null},
+          ${input.startedAt ?? null},
+          ${input.endedAt ?? null},
+          ${sql.json((input.metadata ?? {}) as JSONValue)}
+        )
+        RETURNING *
+      `;
+      return mapVoiceCall(row);
+    },
+
+    async updateByProviderCallId(providerCallId, patch) {
+      const [existing] = await sql<{ id: string }[]>`
+        SELECT id FROM voice_calls WHERE provider_call_id = ${providerCallId} LIMIT 1
+      `;
+      if (!existing) return null;
+
+      const [row] = await sql<Parameters<typeof mapVoiceCall>[0][]>`
+        UPDATE voice_calls SET
+          status = COALESCE(${patch.status ?? null}, status),
+          disposition = COALESCE(${patch.disposition ?? null}, disposition),
+          summary = COALESCE(${patch.summary ?? null}, summary),
+          recording_url = COALESCE(${patch.recordingUrl ?? null}, recording_url),
+          transcript_excerpt = COALESCE(${patch.transcriptExcerpt ?? null}, transcript_excerpt),
+          duration_seconds = COALESCE(${patch.durationSeconds ?? null}, duration_seconds),
+          cost_cents = COALESCE(${patch.costCents ?? null}, cost_cents),
+          started_at = COALESCE(${patch.startedAt ?? null}, started_at),
+          ended_at = COALESCE(${patch.endedAt ?? null}, ended_at),
+          contact_id = COALESCE(${patch.contactId ?? null}, contact_id),
+          company_id = COALESCE(${patch.companyId ?? null}, company_id),
+          campaign_id = COALESCE(${patch.campaignId ?? null}, campaign_id),
+          from_number = COALESCE(${patch.fromNumber ?? null}, from_number),
+          to_number = COALESCE(${patch.toNumber ?? null}, to_number),
+          metadata = metadata || ${sql.json((patch.metadata ?? {}) as JSONValue)}
+        WHERE provider_call_id = ${providerCallId}
+        RETURNING *
+      `;
+      return row ? mapVoiceCall(row) : null;
+    },
+
+    async listRecent(limit = 50) {
+      const rows = await sql<Parameters<typeof mapVoiceCall>[0][]>`
+        SELECT * FROM voice_calls ORDER BY created_at DESC LIMIT ${limit}
+      `;
+      return rows.map(mapVoiceCall);
+    },
+
+    async listByContact(contactId, limit = 20) {
+      const rows = await sql<Parameters<typeof mapVoiceCall>[0][]>`
+        SELECT * FROM voice_calls
+        WHERE contact_id = ${contactId}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+      return rows.map(mapVoiceCall);
+    },
+  };
+
   return {
     sql,
     companies,
@@ -1317,6 +1513,7 @@ export function createDb(databaseUrl: string): Db {
     policy,
     metrics,
     auditLog,
+    voiceCalls,
   };
 }
 
