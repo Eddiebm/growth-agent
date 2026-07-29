@@ -74,6 +74,7 @@ export async function proposeMeeting(
       ${sql.json({
         source: input.source,
         bookingUrl,
+        calcomUrl: bookingUrl,
         campaignId: input.campaignId ?? null,
         companyId: input.companyId ?? null,
         jobId: input.jobId ?? null,

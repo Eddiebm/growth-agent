@@ -40,7 +40,25 @@ CALCOM_BOOKING_URL=https://cal.com/you/15min
 
 Webhook URL: `https://<render-host>/webhooks/vapi`
 
-Flow: inbound email reply classified `book_meeting` → Telegram hot-lead → warm Vapi call → `voice_calls` row → end-of-call webhook writes disposition/note. Meetings stay **pending_confirmation** until `POST /api/meetings/:id/confirm`.
+Flow: inbound email reply classified `book_meeting` → Telegram hot-lead → warm Vapi call → `proposeMeeting` (`pending_confirmation`) → end-of-call webhook writes disposition/note. Meetings stay **pending_confirmation** until confirmed.
+
+### Confirm a meeting
+
+```bash
+curl -X POST https://<render-api>/api/meetings/<meetingId>/confirm \
+  -H 'content-type: application/json' \
+  -d '{"providerEventId":"cal_evt_…","scheduledAt":"2026-08-01T15:00:00Z"}'
+```
+
+Or propose first:
+
+```bash
+curl -X POST https://<render-api>/api/meetings/propose \
+  -H 'content-type: application/json' \
+  -d '{"contactId":"<uuid>","bookingUrl":"https://cal.com/you/15min","source":"manual"}'
+```
+
+Confirm sets status `confirmed`, `confirmed_at`, activity `meeting_booked`, and contact status `meeting_booked`.
 
 ## Migrations
 

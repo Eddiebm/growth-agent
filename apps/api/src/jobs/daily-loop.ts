@@ -651,6 +651,19 @@ export async function replyTriageJob(
           jobId,
           summary: classification.summary,
         });
+        // Propose only — never claim booked until confirmMeeting / calendar webhook
+        try {
+          await proposeMeeting(db.sql as never, {
+            contactId: contact.id,
+            companyId: company.id,
+            campaignId: reply.campaignId,
+            bookingUrl: process.env.CALCOM_BOOKING_URL,
+            source: "reply_triage_book_meeting",
+            jobId,
+          });
+        } catch (err) {
+          console.warn("[calendar] proposeMeeting soft-fail after book_meeting", err);
+        }
         break;
 
       case "escalate_to_human":
@@ -888,7 +901,7 @@ async function maybeWarmFollowUpCall(
     contactId: input.contact.id,
     companyId: input.company.id,
     campaignId: input.campaignId ?? undefined,
-    type: "meeting_proposed",
+    type: "note",
     agentId: "orchestrator",
     jobId: input.jobId,
     externalId: result.callId,
@@ -899,19 +912,6 @@ async function maybeWarmFollowUpCall(
       reason: "warm_reply_book_meeting",
     },
   });
-
-  try {
-    await proposeMeeting(db.sql as never, {
-      contactId: input.contact.id,
-      companyId: input.company.id,
-      campaignId: input.campaignId,
-      bookingUrl: process.env.CALCOM_BOOKING_URL,
-      source: "warm_reply",
-      jobId: input.jobId,
-    });
-  } catch (err) {
-    console.warn("[calendar] proposeMeeting soft-fail", err);
-  }
 }
 
 function cronNext(_expr: string): Date {

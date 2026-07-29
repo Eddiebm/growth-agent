@@ -12,7 +12,14 @@ export default async function ActivityPage() {
       <DashboardNav />
       <main className="mx-auto max-w-4xl px-6 py-6">
         <h1 className="text-lg font-semibold">Activity feed</h1>
-        <p className="mt-1 text-sm text-zinc-500">Last 100 agent actions</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Last 100 agent actions. Voice call costs (when present) live on{" "}
+          <Link href="/dashboard/calls" className="text-accent hover:underline">
+            Calls
+          </Link>
+          ; <code className="text-zinc-400">call_completed</code> metadata may include{" "}
+          <code className="text-zinc-400">costCents</code>.
+        </p>
         <ul className="mt-6 space-y-2">
           {activities.map((a) => (
             <li

@@ -3,6 +3,7 @@
 
 import { config } from "dotenv";
 import { resolve } from "node:path";
+import { resolve4 } from "node:dns/promises";
 import postgres from "postgres";
 import { getHeroProductSlug } from "../packages/hero-config/index.js";
 
@@ -22,11 +23,14 @@ const OPTIONAL_VOICE = [
 ] as const;
 
 async function main(): Promise<void> {
-  const mock = process.env.MOCK_INTEGRATIONS === "true";
+  const mockFlag = process.env.MOCK_INTEGRATIONS;
+  const mock = mockFlag === "true";
   const hero = getHeroProductSlug();
 
   console.log(`\n🎯 Hero product: ${hero}`);
-  console.log(`   Mode: ${mock ? "MOCK (safe)" : "LIVE (real sends)"}\n`);
+  console.log(
+    `   MOCK_INTEGRATIONS=${mockFlag ?? "(unset)"} → ${mock ? "MOCK (safe)" : "LIVE (real sends)"}\n`,
+  );
 
   let failed = 0;
 
@@ -40,7 +44,7 @@ async function main(): Promise<void> {
   }
 
   if (!mock) {
-    console.log("\nLive integration keys:");
+    console.log("\nLive integration keys (Resend + model):");
     for (const key of REQUIRED_LIVE) {
       if (!process.env[key]) {
         console.log(`❌ ${key} — missing`);
@@ -78,19 +82,29 @@ async function main(): Promise<void> {
       console.log("⚠️  CALCOM_BOOKING_URL — booking links will use generic cal.com");
     }
   } else {
-    console.log("\n⏭️  Skipping Resend/Serper/OpenRouter (MOCK_INTEGRATIONS=true)");
+    console.log("\n⏭️  Skipping Resend/Serper/OpenRouter/Vapi (MOCK_INTEGRATIONS=true)");
+    console.log("   Set MOCK_INTEGRATIONS=false on Render before live sends.");
   }
 
-  // Public site reachability (best-effort)
+  // Public site reachability + optional DNS (best-effort)
+  try {
+    const addrs = await resolve4("makola.org");
+    console.log(`\n✅ DNS makola.org → ${addrs.slice(0, 3).join(", ")}`);
+  } catch (err) {
+    console.log(
+      `\n⚠️  DNS makola.org lookup failed: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+
   try {
     const res = await fetch("https://makola.org", { method: "HEAD", redirect: "follow" });
     if (res.ok) {
-      console.log(`\n✅ https://makola.org → HTTP ${res.status}`);
+      console.log(`✅ https://makola.org → HTTP ${res.status}`);
     } else {
-      console.log(`\n⚠️  https://makola.org → HTTP ${res.status} (check Deployment Protection)`);
+      console.log(`⚠️  https://makola.org → HTTP ${res.status} (check Deployment Protection)`);
     }
   } catch (err) {
-    console.log(`\n⚠️  https://makola.org unreachable: ${err instanceof Error ? err.message : err}`);
+    console.log(`⚠️  https://makola.org unreachable: ${err instanceof Error ? err.message : err}`);
   }
 
   const url = process.env.DATABASE_URL;
