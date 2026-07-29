@@ -102,10 +102,15 @@ docs/               # ICP, offer, playbook, voice
 
 ## Go-live checklist
 
-- [ ] `npm run db:migrate` on production Neon  
+Makola domain/ops runbook: [`docs/MAKOLA_UPDATE.md`](docs/MAKOLA_UPDATE.md) (`npm run go-live:check`).
+
+- [ ] `npm run db:migrate` on production Neon (includes `010_meeting_confirmation`)  
 - [ ] Resend domain verified (SPF/DKIM/DMARC)  
 - [ ] `MOCK_INTEGRATIONS=false`  
 - [ ] Resend webhook → `/webhooks/resend`  
+- [ ] Vapi webhook → `/webhooks/vapi`  
 - [ ] `DASHBOARD_SECRET` set  
 - [ ] Warmup: 5 → 10 → 20 sends/day  
 - [ ] Telegram alerts tested  
+- [ ] Meetings stay `pending_confirmation` until `POST /api/meetings/:id/confirm`  
+
