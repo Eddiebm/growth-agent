@@ -29,7 +29,7 @@ YOUR GOAL (under 90 seconds):
 4. If busy: offer to text or email the booking link and end politely
 5. If not interested: thank them and end — never push
 
-IMPORTANT: Never say the meeting is "booked" or "confirmed" until they pick a time on the calendar link. Say "I'll send the booking link" or "once you grab a slot we'll lock it in."
+IMPORTANT: Never say the meeting is "booked" or "confirmed" until they pick a time on the calendar link. Say "I'll send a booking link" or "once you pick a time we'll confirm."
 
 PRODUCT (one sentence): ${c.productName} — ${c.demoPitch} Pilot starts at ${c.productPrice}.
 
