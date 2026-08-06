@@ -25,6 +25,8 @@ import { coerceCopywriterOutput } from "./normalize-copywriter.js";
 import { coerceLeadScorerOutput } from "./normalize-lead-scorer.js";
 import { coerceReplyClassifierOutput } from "./normalize-reply-classifier.js";
 import { coerceResearcherOutput } from "./normalize-researcher.js";
+import { getPlaybookLearnings } from "../../../../packages/learning/playbook-writes.js";
+import { getHeroProductSlug } from "../../../../packages/hero-config/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const EXAMPLES_DIR = join(__dirname, "../../../../packages/schemas/examples");
@@ -59,7 +61,11 @@ export async function runAgent<T extends AgentInput>(
   const parsed = AgentInputSchema.parse(input);
   const started = Date.now();
   const productSlug = "productSlug" in parsed ? parsed.productSlug : undefined;
-  const docs = await loadDocs(["ICP", "OFFER", "VOICE", "PLAYBOOK", "RATE_CARD"], productSlug);
+  const docs = await loadDocs(
+    ["ICP", "OFFER", "VOICE", "PLAYBOOK", "RATE_CARD"],
+    productSlug,
+    db,
+  );
 
   const context = await buildContext(db, parsed);
   const systemPrompt = await buildSystemPrompt(parsed.agentId, docs);
@@ -170,6 +176,8 @@ async function buildSystemPrompt(
       "- callToAction is required (one short sentence)",
       "- toneCheck must be { onBrand: boolean, issues: string[] }",
       "- Do NOT nest under email/draft/result — return flat JSON with bodyText, subject, callToAction, toneCheck",
+      "- Prefer context.sequence.subjectTemplate / bodyTemplate as the angle for this step",
+      "- If context.playbookLearnings is present, address common objections without inventing new claims",
     );
   }
 
@@ -208,16 +216,38 @@ async function loadExampleOutput(agentId: string): Promise<unknown> {
 }
 
 async function buildContext(db: Db, input: AgentInput): Promise<Record<string, unknown>> {
+  const base: Record<string, unknown> = {};
+
   if ("contactId" in input && input.contactId) {
     const contact = await db.contacts.get(input.contactId);
     const company = await db.companies.get(contact.companyId);
-    return { contact, company };
-  }
-  if ("companyId" in input && input.companyId) {
+    base.contact = contact;
+    base.company = company;
+  } else if ("companyId" in input && input.companyId) {
     const company = await db.companies.get(input.companyId);
-    return { company };
+    base.company = company;
   }
-  return {};
+
+  if (input.agentId === "copywriter") {
+    try {
+      const sequence = await db.sequences.getStep(input.campaignId, input.sequenceStep);
+      base.sequence = {
+        stepNumber: sequence.stepNumber,
+        subjectTemplate: sequence.subjectTemplate,
+        bodyTemplate: sequence.bodyTemplate,
+      };
+    } catch {
+      // step may be missing on brand-new campaigns
+    }
+
+    const slug = input.productSlug ?? getHeroProductSlug();
+    const learnings = await getPlaybookLearnings(db, slug);
+    if (learnings.objections.length > 0 || learnings.dispositions.length > 0) {
+      base.playbookLearnings = learnings;
+    }
+  }
+
+  return base;
 }
 
 function entityTypeFor(input: AgentInput): string | undefined {

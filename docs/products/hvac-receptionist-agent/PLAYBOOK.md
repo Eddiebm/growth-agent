@@ -42,6 +42,13 @@ Email #1 must get them to call the regional demo line in the footer. The call se
 - "Too expensive" → one booked emergency job often covers $299/mo
 - "We have an answering service" → ask if it books jobs or just takes messages
 
+## Human review standard
+
+- Kill switch pauses all outreach; never send while PAUSED
+- Approvals gate policy escalations, copywriter flags, high-urgency replies, and weekly PLAYBOOK appends
+- Operators edit ICP/OFFER/PLAYBOOK/VOICE/RATE_CARD in dashboard **Assets**; published versions override this file
+- Subject A/B winners write into sequence step 0 + next automatically after enough impressions
+
 ## Do not
 
 - Wall of text

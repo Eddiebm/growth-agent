@@ -79,12 +79,16 @@ Point to: `https://your-api.onrender.com/webhooks/resend`
 
 ## Operator workflow
 
-1. Check dashboard metrics each morning  
-2. Approve/reject items in approval queue  
-3. Use kill switch to pause outreach instantly  
-4. Click contacts for full timeline  
-5. Only intervene on hot leads and custom pricing  
+Human review is the standard — agents draft and propose; you gate anything that spends reputation or changes messaging.
 
+1. Check dashboard metrics each morning  
+2. Clear the **Human review** queue first (emails, playbook appends, escalations)  
+3. Use **Kill switch · PAUSED** to stop all sends instantly; confirm before resume  
+4. Edit versioned ICP/offer/playbook under **Assets** when positioning changes  
+5. Click contacts for full timeline  
+6. Only intervene on hot leads and custom pricing  
+
+Weekly learning auto-writes winning subject lines into sequence steps 0 + next, stores objection/disposition patterns for the copywriter, and queues PLAYBOOK appends for your approval.
 ## Project structure
 
 ```
@@ -96,8 +100,10 @@ packages/
   policies/         # Hard governance rules
   actions/          # Signup, approval handlers
   system-state/     # Kill switch, caps
+  assets/           # Versioned ICP/offer/playbook overrides
+  learning/         # Weekly promote + playbook writes
 db/migrations/      # Postgres schema
-docs/               # ICP, offer, playbook, voice
+docs/               # ICP, offer, playbook, voice (file fallbacks)
 ```
 
 ## Go-live checklist

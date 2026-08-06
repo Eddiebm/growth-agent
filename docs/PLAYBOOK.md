@@ -64,3 +64,10 @@ Priority order:
 - Custom pricing request
 - Legal/compliance question
 - Angry or threatening reply
+
+## Human review standard
+
+1. **Kill switch** — pauses all outreach instantly; confirm before resume  
+2. **Approvals** — policy escalate, copywriter flags, high-urgency replies, weekly playbook appends  
+3. **Assets** — operator-published ICP/OFFER/PLAYBOOK/VOICE/RATE_CARD override repo files for agents  
+4. Subject A/B winners write into sequence step 0 + next after enough impressions  

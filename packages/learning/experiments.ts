@@ -186,18 +186,36 @@ export async function promoteExperimentWinners(db: Db): Promise<number> {
       WHERE id = ${experiment.id}
     `;
 
-    if (experiment.campaign_id && winningSubject) {
-      await db.sql`
-        UPDATE sequences
-        SET subject_template = ${winningSubject}
-        WHERE campaign_id = ${experiment.campaign_id} AND step_number = 1
-      `;
+    if (experiment.campaign_id) {
+      if (winningSubject) {
+        // Sequences are 0-indexed (step 0 = first touch). Also write into the
+        // next step so follow-ups inherit the proven subject pattern.
+        await db.sql`
+          UPDATE sequences
+          SET subject_template = ${winningSubject}
+          WHERE campaign_id = ${experiment.campaign_id} AND step_number = 0
+        `;
+        await db.sql`
+          UPDATE sequences
+          SET subject_template = ${winningSubject}
+          WHERE campaign_id = ${experiment.campaign_id}
+            AND step_number = (
+              SELECT MIN(s.step_number) FROM sequences s
+              WHERE s.campaign_id = ${experiment.campaign_id} AND s.step_number > 0
+            )
+        `;
+      }
       await db.sql`
         INSERT INTO agent_memory (namespace, key, value)
         VALUES (
           'playbook',
           ${`campaign:${experiment.campaign_id}:subject_line`},
-          ${db.sql.json({ subject: winningSubject, variantLabel: winner.label, experimentId: experiment.id } as JSONValue)}
+          ${db.sql.json({
+            subject: winningSubject,
+            variantLabel: winner.label,
+            experimentId: experiment.id,
+            writtenIntoSteps: winningSubject ? [0, "next"] : [],
+          } as JSONValue)}
         )
         ON CONFLICT (namespace, key)
         DO UPDATE SET value = EXCLUDED.value, updated_at = now()

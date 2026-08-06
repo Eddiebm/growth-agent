@@ -13,3 +13,8 @@ export { calibrateAllProductCac, calibrateProductCac } from "./cac-calibration.j
 export { updateRouterWeightsFromCloses, routerWeightFromMetadata } from "./router-weights.js";
 export { collectPeriodMetrics, type PeriodMetrics } from "./metrics.js";
 export { runWeeklyLearning, type WeeklyLearningResult } from "./weekly.js";
+export {
+  writeWeeklyPlaybookLearnings,
+  getPlaybookLearnings,
+  type PlaybookWriteResult,
+} from "./playbook-writes.js";

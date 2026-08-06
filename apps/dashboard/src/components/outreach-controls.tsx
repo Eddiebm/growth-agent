@@ -31,8 +31,24 @@ export function OutreachControls({
   const [message, setMessage] = useState<string | null>(null);
 
   async function togglePause() {
-    setLoading("pause");
     const next = !paused;
+    if (
+      paused &&
+      !window.confirm(
+        "Resume outreach?\n\nKill switch will turn OFF and queued/automatic sends can go out again.",
+      )
+    ) {
+      return;
+    }
+    if (
+      !paused &&
+      !window.confirm(
+        "Engage kill switch?\n\nAll outreach sends pause immediately until you resume.",
+      )
+    ) {
+      return;
+    }
+    setLoading("pause");
     try {
       const res = await fetch("/api/system/kill-switch", {
         method: "POST",
@@ -160,13 +176,18 @@ export function OutreachControls({
           type="button"
           onClick={togglePause}
           disabled={loading !== null}
+          title={paused ? "Kill switch ON — outreach paused" : "Kill switch OFF — outreach live"}
           className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
             paused
               ? "border-red-500/50 bg-red-500/10 text-red-400"
               : "border-accent/30 bg-accent/10 text-accent"
           }`}
         >
-          {loading === "pause" ? "…" : paused ? "Paused" : "Live"}
+          {loading === "pause"
+            ? "…"
+            : paused
+              ? "Kill switch · PAUSED"
+              : "Kill switch · LIVE"}
         </button>
 
         {mode === "triggered" && (

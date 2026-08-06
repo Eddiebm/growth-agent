@@ -62,6 +62,12 @@ export default async function DashboardHomePage({ searchParams }: PageProps) {
             />
           </div>
         </div>
+        {system.outreachPaused ? (
+          <div className="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            Kill switch is ON — all outreach sends are paused. Resume from the
+            controls above when ready.
+          </div>
+        ) : null}
         <div className="grid gap-8 xl:grid-cols-[1fr_340px]">
           <div className="space-y-8">
             <PipelineBoard columns={PIPELINE_COLUMNS} grouped={grouped} />
@@ -78,8 +84,8 @@ export default async function DashboardHomePage({ searchParams }: PageProps) {
             </section>
           </div>
           <div className="space-y-6">
-            <GoalTracker weekly={weekly} />
             <ApprovalQueue approvals={approvals} />
+            <GoalTracker weekly={weekly} />
           </div>
         </div>
       </main>

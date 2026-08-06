@@ -1,4 +1,6 @@
 import type { Db } from "../../apps/api/src/jobs/db.js";
+import { loadDocs } from "../../apps/api/src/jobs/load-docs.js";
+import { publishAsset, isAssetKind, type AssetKind } from "../assets/index.js";
 import { triggerOutreach } from "./trigger-outreach.js";
 
 export async function processApproval(
@@ -40,7 +42,14 @@ export async function processApproval(
     metadata: { approvalId, action: approval.action },
   });
 
-  if (decision !== "approved" || approval.action !== "send_email" || !approval.contact_id) {
+  if (decision !== "approved") return;
+
+  if (approval.action === "publish_content") {
+    await applyPublishContent(db, approval.payload);
+    return;
+  }
+
+  if (approval.action !== "send_email" || !approval.contact_id) {
     return;
   }
 
@@ -59,4 +68,45 @@ export async function processApproval(
     campaignId,
     triggerId: approvalId,
   });
+}
+
+async function applyPublishContent(
+  db: Db,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const type = payload.type;
+  if (type === "playbook_append") {
+    const productSlug = String(payload.productSlug ?? "");
+    const kindRaw = String(payload.kind ?? "PLAYBOOK");
+    const appendBlock = String(payload.appendBlock ?? "");
+    if (!productSlug || !appendBlock || !isAssetKind(kindRaw)) return;
+
+    const kind = kindRaw as AssetKind;
+    const docs = await loadDocs([kind], productSlug, db);
+    const current = docs[kind] ?? "";
+    const next = current.includes(appendBlock.trim())
+      ? current
+      : `${current.trimEnd()}\n${appendBlock}`;
+
+    await publishAsset(db, {
+      productSlug,
+      kind,
+      content: next,
+      updatedBy: "approval:strategist",
+    });
+    return;
+  }
+
+  if (type === "asset_publish") {
+    const productSlug = String(payload.productSlug ?? "");
+    const kindRaw = String(payload.kind ?? "");
+    const content = String(payload.content ?? "");
+    if (!productSlug || !content || !isAssetKind(kindRaw)) return;
+    await publishAsset(db, {
+      productSlug,
+      kind: kindRaw as AssetKind,
+      content,
+      updatedBy: "approval:dashboard",
+    });
+  }
 }

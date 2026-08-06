@@ -717,7 +717,7 @@ export async function replyTriageJob(
 export async function learningWeeklyJob(db: Db, jobId: string): Promise<void> {
   const result = await runWeeklyLearning(db, jobId);
   console.log(
-    `[learning] CAC:${result.cacProductsUpdated} router:${result.routerWeightsUpdated} experiments:${result.experimentsPromoted}`,
+    `[learning] CAC:${result.cacProductsUpdated} router:${result.routerWeightsUpdated} experiments:${result.experimentsPromoted} objections:${result.playbookWrites.objectionsWritten} dispositions:${result.playbookWrites.dispositionsWritten} playbookApprovals:${result.playbookWrites.pendingApprovals}`,
   );
 }
 

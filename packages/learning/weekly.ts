@@ -6,12 +6,17 @@ import { runAgent } from "../../apps/api/src/jobs/agent-runner.js";
 import { calibrateAllProductCac } from "./cac-calibration.js";
 import { promoteExperimentWinners } from "./experiments.js";
 import { collectPeriodMetrics } from "./metrics.js";
+import {
+  writeWeeklyPlaybookLearnings,
+  type PlaybookWriteResult,
+} from "./playbook-writes.js";
 import { updateRouterWeightsFromCloses } from "./router-weights.js";
 
 export interface WeeklyLearningResult {
   cacProductsUpdated: number;
   routerWeightsUpdated: number;
   experimentsPromoted: number;
+  playbookWrites: PlaybookWriteResult;
   strategistSummary: string;
 }
 
@@ -41,6 +46,7 @@ export async function runWeeklyLearning(
   const cacProductsUpdated = await calibrateAllProductCac(db);
   const routerWeightsUpdated = await updateRouterWeightsFromCloses(db);
   const experimentsPromoted = await promoteExperimentWinners(db);
+  const playbookWrites = await writeWeeklyPlaybookLearnings(db, periodStart, periodEnd);
 
   await db.sql`
     INSERT INTO agent_memory (namespace, key, value)
@@ -59,6 +65,7 @@ export async function runWeeklyLearning(
         cacProductsUpdated,
         routerWeightsUpdated,
         experimentsPromoted,
+        playbookWrites,
       } as unknown as JSONValue)}
     )
     ON CONFLICT (namespace, key)
@@ -75,6 +82,7 @@ export async function runWeeklyLearning(
       cacProductsUpdated,
       routerWeightsUpdated,
       experimentsPromoted,
+      playbookWrites,
     },
   });
 
@@ -82,6 +90,7 @@ export async function runWeeklyLearning(
     cacProductsUpdated,
     routerWeightsUpdated,
     experimentsPromoted,
+    playbookWrites,
     strategistSummary: strategistOutput.summary,
   };
 }
