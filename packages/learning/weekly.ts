@@ -8,9 +8,15 @@ import { promoteExperimentWinners } from "./experiments.js";
 import { collectPeriodMetrics } from "./metrics.js";
 import {
   writeWeeklyPlaybookLearnings,
+  getPlaybookLearnings,
   type PlaybookWriteResult,
 } from "./playbook-writes.js";
 import { updateRouterWeightsFromCloses } from "./router-weights.js";
+import { getHeroProductSlug } from "../hero-config/index.js";
+import {
+  buildThemesSummaryFromWeekly,
+  postAedeContentHints,
+} from "../integrations/aede-bridge.js";
 
 export interface WeeklyLearningResult {
   cacProductsUpdated: number;
@@ -85,6 +91,46 @@ export async function runWeeklyLearning(
       playbookWrites,
     },
   });
+
+  // Optional AEDE push — skipped entirely when AEDE_CONTENT_HINTS_URL is unset.
+  try {
+    const productSlug = getHeroProductSlug();
+    const playbook = await getPlaybookLearnings(db, productSlug);
+    const extra: string[] = [];
+    if (playbook.objections.length) {
+      extra.push("Top objections:");
+      for (const o of playbook.objections.slice(0, 5)) {
+        extra.push(`- ${o}`);
+      }
+    }
+    if (playbook.dispositions.length) {
+      extra.push("Call dispositions:");
+      for (const d of playbook.dispositions.slice(0, 5)) {
+        extra.push(`- ${d}`);
+      }
+    }
+
+    const base = buildThemesSummaryFromWeekly({
+      summary: strategistOutput.summary,
+      wins: strategistOutput.wins,
+      losses: strategistOutput.losses,
+      recommendations: strategistOutput.recommendations,
+      playbookWrites,
+    });
+    const themesSummary = [base, ...extra].filter(Boolean).join("\n").slice(0, 11_000);
+
+    await postAedeContentHints({
+      productSlug,
+      themesSummary,
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+    });
+  } catch (e) {
+    console.error(
+      "[WeeklyLearning] AEDE bridge error (Makola continues)",
+      e instanceof Error ? e.message : e,
+    );
+  }
 
   return {
     cacProductsUpdated,

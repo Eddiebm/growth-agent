@@ -1,7 +1,10 @@
 export const BRAND = {
+  /** Public / customer-facing product name */
   name: "Makola",
-  tagline: "Your AI sales employee",
-  platform: "Revenue OS",
+  /** Combined operator product (phone + publishing) */
+  osName: "Makola OS",
+  tagline: "Calls booked. Content running.",
+  platform: "Makola OS",
   domain: "makola.org",
   fromEmail: "outreach@makola.org",
 } as const;

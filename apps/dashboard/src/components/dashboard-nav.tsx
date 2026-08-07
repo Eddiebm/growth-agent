@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
 const links = [
+  { href: "/dashboard/os", label: "Home" },
   { href: "/dashboard", label: "Pipeline" },
   { href: "/dashboard/calls", label: "Calls" },
   { href: "/dashboard/assets", label: "Assets" },
@@ -16,10 +17,13 @@ export function DashboardNav() {
     <header className="border-b border-surface-border bg-surface-raised/80 backdrop-blur">
       <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-4">
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
-            {BRAND.name}
+          <Link
+            href="/dashboard/os"
+            className="text-lg font-semibold tracking-tight"
+          >
+            {BRAND.osName}
           </Link>
-          <nav className="flex gap-4">
+          <nav className="flex flex-wrap gap-4">
             {links.map((l) => (
               <Link
                 key={l.href}
