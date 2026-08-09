@@ -52,6 +52,7 @@ import {
 import { buildEmailFooter } from "../../../../packages/vapi/demo-lines.js";
 import { warmFollowUpCall } from "../../../../packages/vapi/warm-call.js";
 import { proposeMeeting } from "../../../../packages/calendar/booking.js";
+import { runAudit } from "../../../../packages/answer-share/audit-runner.js";
 import type { Company, Contact } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +65,8 @@ export type JobType =
   | "outreach"
   | "reply_triage"
   | "daily_report"
-  | "learning_weekly";
+  | "learning_weekly"
+  | "answer_share_audit";
 
 export interface JobRecord {
   id: string;
@@ -96,6 +98,12 @@ export async function dispatchJob(db: Db, job: JobRecord): Promise<void> {
       case "learning_weekly":
         await learningWeeklyJob(db, job.id);
         break;
+      case "answer_share_audit": {
+        const payload = job.payload as { auditId?: string };
+        if (!payload.auditId) throw new Error("answer_share_audit requires auditId");
+        await runAudit(db, payload.auditId);
+        break;
+      }
       default: {
         const _exhaustive: never = job.jobType;
         throw new Error(`Unknown job type: ${_exhaustive}`);

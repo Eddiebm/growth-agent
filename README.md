@@ -2,12 +2,15 @@
 
 Autonomous marketing & sales system — Postgres CRM, agent workers, operator dashboard.
 
+**AnswerShare by Makola** (AI visibility audits for local HVAC) lives at `/answer-share`. See [docs/ANSWER_SHARE_README.md](./docs/ANSWER_SHARE_README.md) and [docs/ANSWER_SHARE.md](./docs/ANSWER_SHARE.md).
+
 ## Architecture
 
 ```
-Landing (/)          → signup → Neon CRM
-Dashboard (/dashboard) → pipeline, approvals, kill switch
-API worker (:3456)     → cron, job queue, Resend webhook
+Landing (/)                  → HVAC signup → Neon CRM
+AnswerShare (/answer-share)  → free audit → demo/live providers → report / $199 Stripe
+Dashboard (/dashboard)       → pipeline, approvals, kill switch
+API worker (:3456)           → cron, job queue, Resend + AnswerShare audit jobs
 ```
 
 ## Quick start (local)
@@ -102,8 +105,9 @@ packages/
   system-state/     # Kill switch, caps
   assets/           # Versioned ICP/offer/playbook overrides
   learning/         # Weekly promote + playbook writes
+  answer-share/     # AI visibility audits (providers, metrics, Stripe)
 db/migrations/      # Postgres schema
-docs/               # ICP, offer, playbook, voice (file fallbacks)
+docs/               # ICP, offer, playbook, voice, AnswerShare
 ```
 
 ## Go-live checklist

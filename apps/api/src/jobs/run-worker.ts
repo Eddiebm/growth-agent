@@ -122,6 +122,8 @@ function defaultPayload(jobType: JobType): unknown {
       };
     case "learning_weekly":
       return {};
+    case "answer_share_audit":
+      return { auditId: process.env.ANSWER_SHARE_AUDIT_ID ?? "" };
     default: {
       const _exhaustive: never = jobType;
       return _exhaustive;

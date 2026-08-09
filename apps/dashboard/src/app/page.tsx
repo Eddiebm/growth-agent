@@ -15,12 +15,14 @@ export default function LandingPage() {
       <header className="border-b border-surface-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <span className="font-semibold tracking-tight">{BRAND.name}</span>
-          <Link
-            href="/dashboard"
-            className="text-sm text-zinc-500 hover:text-accent"
-          >
-            Operators →
-          </Link>
+          <nav aria-label="Primary" className="flex items-center gap-4 text-sm">
+            <Link href="/answer-share" className="text-zinc-500 hover:text-accent">
+              AnswerShare
+            </Link>
+            <Link href="/dashboard" className="text-zinc-500 hover:text-accent">
+              Operators →
+            </Link>
+          </nav>
         </div>
       </header>
 
