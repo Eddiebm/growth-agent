@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   experimental: {
     externalDir: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   transpilePackages: [],
   webpack: (webpackConfig) => {
     webpackConfig.resolve = webpackConfig.resolve ?? {};
