@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 
 export async function GET() {
   const jar = await cookies();
@@ -11,7 +11,7 @@ export async function GET() {
   const db = getDb();
   try {
     const [org] = await db.sql<{ id: string; is_demo: boolean }[]>`
-      SELECT id, is_demo FROM as_organizations WHERE access_token = ${token}
+      SELECT id, is_demo FROM as_organizations WHERE access_token_hash = ${hashAccessToken(token)}
     `;
     if (!org) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 

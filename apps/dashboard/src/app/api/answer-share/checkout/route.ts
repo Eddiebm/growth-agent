@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createStripeCheckoutSession } from "../../../../../../../packages/answer-share/index";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 
 export async function POST(request: Request) {
   const jar = await cookies();
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const db = getDb();
   try {
     const [org] = await db.sql<{ id: string; name: string }[]>`
-      SELECT id, name FROM as_organizations WHERE access_token = ${accessToken}
+      SELECT id, name FROM as_organizations WHERE access_token_hash = ${hashAccessToken(accessToken)}
     `;
     if (!org) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 

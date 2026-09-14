@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { AnswerShareShell } from "@/components/answer-share/shell";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +59,7 @@ export default async function AnswerShareEvidencePage({
   const db = getDb();
   try {
     const [org] = await db.sql<{ id: string; is_demo: boolean }[]>`
-      SELECT id, is_demo FROM as_organizations WHERE access_token = ${token}
+      SELECT id, is_demo FROM as_organizations WHERE access_token_hash = ${hashAccessToken(token)}
     `;
     if (!org) redirect("/answer-share/free-audit");
 

@@ -50,6 +50,7 @@ export {
   trackEvent,
   newAccessToken,
   hashShareToken,
+  hashAccessToken,
   DEMO_ORG_ID,
   DEMO_BUSINESS_ID,
   DEMO_AUDIT_ID,

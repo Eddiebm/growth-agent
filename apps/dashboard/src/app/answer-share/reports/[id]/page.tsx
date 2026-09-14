@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { AnswerShareShell } from "@/components/answer-share/shell";
 import { MetricBars } from "@/components/answer-share/metric-bars";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 import { hashShareToken } from "../../../../../../../packages/answer-share/index";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +111,7 @@ export default async function AnswerShareReportPage({
     let allowed = false;
     if (sessionToken) {
       const [org] = await db.sql<{ id: string }[]>`
-        SELECT id FROM as_organizations WHERE access_token = ${sessionToken}
+        SELECT id FROM as_organizations WHERE access_token_hash = ${hashAccessToken(sessionToken)}
       `;
       if (org?.id === report.organization_id) allowed = true;
     }

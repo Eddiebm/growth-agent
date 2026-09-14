@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 
 async function readRecommendationId(request: Request): Promise<string | null> {
   const contentType = request.headers.get("content-type") ?? "";
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const db = getDb();
   try {
     const [org] = await db.sql<{ id: string }[]>`
-      SELECT id FROM as_organizations WHERE access_token = ${accessToken}
+      SELECT id FROM as_organizations WHERE access_token_hash = ${hashAccessToken(accessToken)}
     `;
     if (!org) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 

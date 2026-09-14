@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
 import { getDb } from "@/lib/db";
+import { hashAccessToken } from "../../../../packages/answer-share/index";
 
 export const AS_COOKIE = "answer_share_session";
+export { hashAccessToken };
 
 export async function getAnswerShareSession(): Promise<{
   organizationId: string;
@@ -15,15 +17,15 @@ export async function getAnswerShareSession(): Promise<{
   const db = getDb();
   try {
     const [org] = await db.sql<
-      { id: string; access_token: string; is_demo: boolean; subscription_status: string }[]
+      { id: string; is_demo: boolean; subscription_status: string }[]
     >`
-      SELECT id, access_token, is_demo, subscription_status
-      FROM as_organizations WHERE access_token = ${token}
+      SELECT id, is_demo, subscription_status
+      FROM as_organizations WHERE access_token_hash = ${hashAccessToken(token)}
     `;
     if (!org) return null;
     return {
       organizationId: org.id,
-      accessToken: org.access_token,
+      accessToken: token,
       isDemo: org.is_demo,
       subscriptionStatus: org.subscription_status,
     };
