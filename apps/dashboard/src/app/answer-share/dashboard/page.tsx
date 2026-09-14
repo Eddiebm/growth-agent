@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AnswerShareShell } from "@/components/answer-share/shell";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 import { cookies } from "next/headers";
 import { MetricBars } from "@/components/answer-share/metric-bars";
 
@@ -16,7 +16,7 @@ export default async function AnswerShareDashboardPage() {
   const db = getDb();
   try {
     const [org] = await db.sql<{ id: string; is_demo: boolean; subscription_status: string }[]>`
-      SELECT id, is_demo, subscription_status FROM as_organizations WHERE access_token = ${token}
+      SELECT id, is_demo, subscription_status FROM as_organizations WHERE access_token_hash = ${hashAccessToken(token)}
     `;
     if (!org) redirect("/answer-share/free-audit");
 

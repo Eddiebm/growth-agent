@@ -28,6 +28,10 @@ export function hashShareToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export function hashAccessToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export function trackEvent(
   db: Db,
   input: {
@@ -71,10 +75,10 @@ export async function createBusinessFromOnboarding(db: Db, input: OnboardingInpu
   const accessToken = newAccessToken();
   const isDemo = Boolean(input.forceDemo) || process.env.ANSWER_SHARE_FORCE_DEMO === "true";
 
-  const [org] = await db.sql<{ id: string; access_token: string }[]>`
-    INSERT INTO as_organizations (name, access_token, is_demo, plan_key)
-    VALUES (${input.businessName}, ${accessToken}, ${isDemo}, 'free_audit')
-    RETURNING id, access_token
+  const [org] = await db.sql<{ id: string }[]>`
+    INSERT INTO as_organizations (name, access_token_hash, is_demo, plan_key)
+    VALUES (${input.businessName}, ${hashAccessToken(accessToken)}, ${isDemo}, 'free_audit')
+    RETURNING id
   `;
 
   if (input.email) {
@@ -198,7 +202,7 @@ export async function createBusinessFromOnboarding(db: Db, input: OnboardingInpu
 
   return {
     organizationId: org.id,
-    accessToken: org.access_token,
+    accessToken,
     businessId: business.id,
     questionIds,
     crawl,

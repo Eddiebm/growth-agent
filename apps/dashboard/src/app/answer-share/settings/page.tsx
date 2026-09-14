@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { AnswerShareShell } from "@/components/answer-share/shell";
 import { getDb } from "@/lib/db";
-import { AS_COOKIE } from "@/lib/answer-share-session";
+import { AS_COOKIE, hashAccessToken } from "@/lib/answer-share-session";
 import {
   ANSWER_SHARE_PLAN,
   providerConfigStatus,
@@ -28,7 +28,7 @@ export default async function AnswerShareSettingsPage() {
       }[]
     >`
       SELECT id, name, is_demo, subscription_status, plan_key
-      FROM as_organizations WHERE access_token = ${token}
+      FROM as_organizations WHERE access_token_hash = ${hashAccessToken(token)}
     `;
     if (!org) redirect("/answer-share/free-audit");
 
