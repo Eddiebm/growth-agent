@@ -26,6 +26,9 @@ export default function AnswerShareLandingPage() {
             <Link href="/answer-share/reports/sample" className="text-zinc-400 hover:text-accent">
               Sample report
             </Link>
+            <Link href="/answer-share/login" className="text-zinc-400 hover:text-accent">
+              Sign in
+            </Link>
             <Link href="/answer-share/free-audit" className="text-accent hover:underline">
               Free audit
             </Link>
