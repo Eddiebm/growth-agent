@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { getDb } from "./db-singleton.js";
 import {
@@ -20,6 +20,7 @@ import {
   dispositionSuggestsBooked,
 } from "../../../packages/vapi/webhook.js";
 import { proposeMeeting, confirmMeeting } from "../../../packages/calendar/booking.js";
+import { verifyUnsubscribeToken } from "../../../packages/vapi/unsubscribe.js";
 
 function verifyCronAuth(c: { req: { header: (name: string) => string | undefined } }): boolean {
   const secret = process.env.CRON_SECRET;
@@ -248,6 +249,44 @@ export function createApp(): Hono {
     });
     return c.json(result);
   });
+
+  // Public, unauthenticated by design: this is the one-click unsubscribe
+  // link/endpoint in every outbound email's footer (CAN-SPAM). Authorization
+  // comes from the signed per-contact token in the link itself, not a login
+  // — see packages/vapi/unsubscribe.ts. Both verbs unsubscribe immediately;
+  // POST also satisfies RFC 8058 one-click unsubscribe for mail clients that
+  // send `List-Unsubscribe-Post: List-Unsubscribe=One-Click`.
+  const unsubscribeHandler = async (c: Context) => {
+    const contactId = c.req.query("c");
+    const email = c.req.query("e");
+    const token = c.req.query("t");
+    if (!contactId || !email || !token || !verifyUnsubscribeToken(contactId, email, token)) {
+      return c.json({ error: "Invalid or expired unsubscribe link" }, 400);
+    }
+
+    const db = getDb();
+    const contact = await db.contacts.get(contactId).catch(() => null);
+    if (!contact || contact.email.toLowerCase() !== email.toLowerCase()) {
+      return c.json({ error: "Invalid or expired unsubscribe link" }, 400);
+    }
+
+    await db.suppression.add(contact.email, "unsubscribe_link");
+    await db.contacts.update(contact.id, {
+      status: "unsubscribed",
+      doNotContact: true,
+      unsubscribedAt: new Date(),
+    });
+
+    return c.html(
+      "<!doctype html><html><body style=\"font-family:sans-serif;max-width:32rem;margin:4rem auto;\">" +
+        "<h1>You're unsubscribed</h1>" +
+        `<p>${email} won't receive any more emails from us.</p>` +
+        "</body></html>",
+    );
+  };
+
+  app.get("/api/unsubscribe", unsubscribeHandler);
+  app.post("/api/unsubscribe", unsubscribeHandler);
 
   app.post("/api/signup", async (c) => {
     const db = getDb();

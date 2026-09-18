@@ -506,7 +506,7 @@ export async function outreachJob(
 
     const company = await db.companies.get(contact.companyId);
     const geo = companyGeo(company);
-    const footer = await buildEmailFooter(geo);
+    const footer = await buildEmailFooter({ ...geo, contactId: contact.id, email: contact.email });
     const bodyText = `${draft.bodyText ?? ""}${footer.text}`;
     const bodyHtml = draft.bodyHtml ? `${draft.bodyHtml}${footer.html}` : undefined;
 
@@ -516,6 +516,11 @@ export async function outreachJob(
       text: bodyText,
       html: bodyHtml,
       tags: { campaignId, contactId: contact.id },
+      // CAN-SPAM one-click unsubscribe (RFC 8058): mail clients that
+      // support it show an "Unsubscribe" action without opening the email.
+      listUnsubscribe: {
+        url: footer.unsubscribeUrl,
+      },
     });
 
     if (variant) {

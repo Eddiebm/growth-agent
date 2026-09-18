@@ -33,6 +33,11 @@ export interface SendEmailInput {
   html?: string;
   tags?: Record<string, string>;
   replyTo?: string;
+  /** CAN-SPAM one-click unsubscribe (RFC 8058). */
+  listUnsubscribe?: {
+    url: string;
+    mailto?: string;
+  };
 }
 
 export interface SendEmailResult {
@@ -309,6 +314,16 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const apiKey = requireEnv("RESEND_API_KEY");
   const from = requireEnv("RESEND_FROM_EMAIL");
 
+  const headers: Record<string, string> = {};
+  if (input.listUnsubscribe) {
+    const parts = [`<${input.listUnsubscribe.url}>`];
+    if (input.listUnsubscribe.mailto) parts.push(`<mailto:${input.listUnsubscribe.mailto}>`);
+    headers["List-Unsubscribe"] = parts.join(", ");
+    // RFC 8058: tells one-click-capable mail clients to POST rather than
+    // just GET the link, so opening/previewing the mail can't unsubscribe.
+    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
+
   const res = await fetch(`${RESEND_BASE}/emails`, {
     method: "POST",
     headers: {
@@ -325,6 +340,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       tags: input.tags
         ? Object.entries(input.tags).map(([name, value]) => ({ name, value }))
         : undefined,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
     }),
   });
 

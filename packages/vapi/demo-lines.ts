@@ -1,4 +1,5 @@
 import { listPhoneNumbers, type VapiPhoneNumber } from "./index.js";
+import { buildUnsubscribeUrl } from "./unsubscribe.js";
 
 export interface DemoLine {
   areaCode: string;
@@ -102,24 +103,36 @@ export async function pickDemoLine(opts: {
 export async function buildEmailFooter(opts: {
   state?: string | null;
   searchCity?: string | null;
-}): Promise<{ text: string; html: string; demoLine: DemoLine }> {
+  contactId: string;
+  email: string;
+}): Promise<{ text: string; html: string; demoLine: DemoLine; unsubscribeUrl: string }> {
   const demoLine = await pickDemoLine(opts);
   const display = formatPhoneDisplay(demoLine.number);
+  const unsubscribeUrl = buildUnsubscribeUrl({ contactId: opts.contactId, email: opts.email });
+  // CAN-SPAM requires a valid physical postal address in every commercial
+  // email. No real address is configured yet — set COMPANY_POSTAL_ADDRESS
+  // before sending real outbound mail; this placeholder is a compliance gap
+  // until then, not a fix.
+  const postalAddress = process.env.COMPANY_POSTAL_ADDRESS ?? "[COMPANY ADDRESS]";
 
   const text = [
     "",
     "---",
     `Want to hear it? Call our ${demoLine.label} demo line: ${display}`,
     "Pretend you're a customer with a broken AC — that's what your shop would get.",
+    "",
+    postalAddress,
+    `Don't want these emails? Unsubscribe: ${unsubscribeUrl}`,
   ].join("\n");
 
   const html = [
     "<hr />",
     `<p><strong>Want to hear it?</strong> Call our ${demoLine.label} demo line: <a href="tel:${demoLine.number}">${display}</a></p>`,
     "<p><em>Pretend you're a customer with a broken AC — that's what your shop would get.</em></p>",
+    `<p style="font-size:12px;color:#666;">${postalAddress}<br/><a href="${unsubscribeUrl}">Unsubscribe</a></p>`,
   ].join("");
 
-  return { text, html, demoLine };
+  return { text, html, demoLine, unsubscribeUrl };
 }
 
 export function toE164(phone: string): string | null {
